@@ -20,12 +20,19 @@ pnpm pcf diff partidaAntes.XXX partidaDespues.XXX
 # Ver la caja del club y sugerencias de edición (PCF6 Argentina)
 pnpm pcf caja fixtures/manag003.000 --pesos 755149
 
-# Editar la caja (escribe una copia .editada, nunca pisa el original)
+# Editar la caja: guarda directo sobre el archivo, con backup automático previo
+# (<archivo>.bak-<timestamp>). Con --salida escribe a otra ruta sin tocar el original.
 pnpm pcf caja fixtures/manag003.000 --pesos 755149 --set 7000000
 
 # Tests
 pnpm test
 ```
+
+## Interfaz gráfica
+
+[web/pcf-toolkit.html](web/pcf-toolkit.html) — editor visual standalone (sin dependencias ni servidor): abrilo en Edge/Chrome, cargá el `managXXX.XXX`, localizá la caja con el valor que muestra el juego y editá con las sugerencias del advisor. Guarda **directo sobre el archivo** (File System Access API) con botones de backup y restaurar. En navegadores sin esa API, descarga el archivo editado con el mismo nombre.
+
+El hex editor manual ([web/pcf-editor.html](web/pcf-editor.html)) sigue disponible como fallback de debug.
 
 ## Estado
 
@@ -34,6 +41,3 @@ pnpm test
 
 Próximos pasos: bloque de estadio (candidatos ya anotados en `offsets.json`) y atributos de jugadores.
 
-## Herramientas auxiliares
-
-- [web/pcf-editor.html](web/pcf-editor.html): hex editor manual standalone, útil como fallback de debug.

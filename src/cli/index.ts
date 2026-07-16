@@ -6,7 +6,7 @@
  */
 
 import { Command } from 'commander';
-import { parse as parsearRuta, format as formatearRuta } from 'node:path';
+import { copyFile } from 'node:fs/promises';
 import { diffSaves, type RangoDiff } from '../reverse-engineering/diff';
 import { readInt32LE, readUint16LE, readUint32LE } from '../core/buffer';
 import { escribirCaja, localizarCaja, pesosAPesetas, TECHO_PESOS } from '../core/caja';
@@ -105,12 +105,11 @@ programa
   .argument('<archivo>', 'archivo de partida (managXXX.XXX)')
   .requiredOption('--pesos <n>', 'caja actual EXACTA como la muestra la pantalla de finanzas del juego')
   .option('--set <n>', 'nueva caja deseada, en pesos mostrados')
-  .option('--salida <ruta>', 'a dónde escribir la copia editada (default: <nombre>.editada.<ext> al lado del original)')
-  .option('--sobrescribir-original', 'CONFIRMACIÓN explícita para pisar el archivo de origen', false)
+  .option('--salida <ruta>', 'escribir a otra ruta en vez de pisar el archivo (en ese caso no se hace backup)')
   .action(
     async (
       archivo: string,
-      opciones: { pesos: string; set?: string; salida?: string; sobrescribirOriginal: boolean },
+      opciones: { pesos: string; set?: string; salida?: string },
     ) => {
       const cajaMostrada = Number.parseInt(opciones.pesos, 10);
       if (!Number.isInteger(cajaMostrada) || cajaMostrada < 0) {
@@ -148,22 +147,24 @@ programa
 
       escribirCaja(save.data, caja.offsets, pesosAPesetas(nuevaPesos));
 
-      let destino: string;
-      if (opciones.sobrescribirOriginal) {
-        destino = archivo;
-      } else if (opciones.salida) {
-        destino = opciones.salida;
-      } else {
-        const partes = parsearRuta(archivo);
-        destino = formatearRuta({ dir: partes.dir, name: `${partes.name}.editada`, ext: partes.ext });
+      if (opciones.salida) {
+        // Escritura a otra ruta: el original no se toca, no hace falta backup.
+        await save.write(opciones.salida);
+        console.log(`\nListo: caja ${pesos(caja.pesos)} → ${pesos(nuevaPesos)} (${caja.offsets.length} copias actualizadas)`);
+        console.log(`Escrito en: ${opciones.salida} (el original queda intacto)`);
+        return;
       }
-      await save.write(destino, { sobrescribirOriginal: opciones.sobrescribirOriginal });
+
+      // Escritura en el lugar: SIEMPRE con backup automático previo del original.
+      const marca = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+      const backup = `${archivo}.bak-${marca}`;
+      await copyFile(archivo, backup);
+      await save.write(archivo, { sobrescribirOriginal: true });
 
       console.log(`\nListo: caja ${pesos(caja.pesos)} → ${pesos(nuevaPesos)} (${caja.offsets.length} copias actualizadas)`);
-      console.log(`Escrito en: ${destino}`);
-      if (!opciones.sobrescribirOriginal) {
-        console.log('El original queda intacto. Para usarlo en el juego, copialo sobre el archivo original (con el juego cerrado).');
-      }
+      console.log(`Guardado directo en: ${archivo}`);
+      console.log(`Backup del original: ${backup}`);
+      console.log('Recordá: editá siempre con el juego cerrado.');
     },
   );
 

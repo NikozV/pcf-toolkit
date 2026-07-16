@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCF Toolkit — Editor de partidas</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚽</text></svg>">
+<style>
+  /* ==========================================================================
+     PCF Toolkit — editor de partidas de PC Fútbol 6 (edición Argentina)
+     Standalone: sin dependencias, funciona abriendo el archivo en el navegador.
+     La lógica de caja es un port de src/core/caja.ts (fuente de la verdad).
+     ========================================================================== */
+  :root {
+    --fondo: #0b1220;
+    --fondo-2: #101a2e;
+    --panel: #141f36;
+    --panel-2: #1a2745;
+    --borde: #24345c;
+    --borde-suave: #1d2b4d;
+    --texto: #e7edf8;
+    --texto-2: #9fb0cf;
+    --texto-3: #64769c;
+    --verde: #35d07f;
+    --verde-osc: #1f9c5c;
+    --dorado: #f5c451;
+    --rojo: #f0616d;
+    --azul: #5b8def;
+    --mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+    --radio: 12px;
+    --sombra: 0 10px 30px rgba(0, 0, 0, .35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(1200px 500px at 80% -10%, rgba(53, 208, 127, .07), transparent 60%),
+      radial-gradient(900px 400px at -10% 110%, rgba(91, 141, 239, .06), transparent 60%),
+      var(--fondo);
+    color: var(--texto);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  ::selection { background: rgba(53, 208, 127, .35); }
+
+  /* ---------- header ---------- */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 28px;
+    background: rgba(11, 18, 32, .85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--borde-suave);
+  }
+  .logo {
+    display: grid; place-items: center;
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--verde-osc), var(--verde));
+    font-size: 22px;
+    box-shadow: 0 4px 14px rgba(53, 208, 127, .35);
+  }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: .4px; }
+  header h1 span { color: var(--verde); }
+  header .sub { font-size: 12.5px; color: var(--texto-3); margin-top: 1px; }
+  .estado-archivo {
+    margin-left: auto; display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: var(--texto-2);
+  }
+  .punto { width: 8px; height: 8px; border-radius: 50%; background: var(--texto-3); }
+  .punto.ok { background: var(--verde); box-shadow: 0 0 8px var(--verde); }
+  .punto.sucio { background: var(--dorado); box-shadow: 0 0 8px var(--dorado); }
+
+  /* ---------- layout ---------- */
+  main {
+    max-width: 1100px; margin: 0 auto; padding: 28px;
+    display: grid; grid-template-columns: 1fr 340px; gap: 22px;
+    align-items: start;
+  }
+  @media (max-width: 940px) { main { grid-template-columns: 1fr; } }
+
+  section.tarjeta {
+    background: linear-gradient(180deg, var(--panel), var(--fondo-2));
+    border: 1px solid var(--borde-suave);
+    border-radius: var(--radio);
+    padding: 22px;
+    box-shadow: var(--sombra);
+  }
+  section.tarjeta + section.tarjeta { margin-top: 22px; }
+  h2 {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; letter-spacing: 1.6px; text-transform: uppercase;
+    color: var(--texto-2); margin: 0 0 16px;
+  }
+  h2 .paso {
+    display: grid; place-items: center;
+    width: 22px; height: 22px; border-radius: 7px;
+    background: var(--panel-2); border: 1px solid var(--borde);
+    color: var(--verde); font-size: 12px; font-weight: 700;
+  }
+
+  /* ---------- zona de archivo ---------- */
+  .zona-drop {
+    border: 2px dashed var(--borde);
+    border-radius: var(--radio);
+    padding: 34px 20px;
+    text-align: center;
+    color: var(--texto-2);
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .zona-drop:hover, .zona-drop.encima { border-color: var(--verde); background: rgba(53, 208, 127, .05); }
+  .zona-drop .icono { font-size: 34px; display: block; margin-bottom: 8px; }
+  .zona-drop strong { color: var(--texto); }
+  .zona-drop .pista { font-size: 12.5px; color: var(--texto-3); margin-top: 6px; }
+
+  .ficha-archivo { display: none; align-items: center; gap: 14px; }
+  .ficha-archivo.visible { display: flex; }
+  .ficha-archivo .icono-doc {
+    width: 46px; height: 46px; border-radius: 10px;
+    display: grid; place-items: center; font-size: 22px;
+    background: var(--panel-2); border: 1px solid var(--borde);
+  }
+  .ficha-archivo .nombre { font-family: var(--mono); font-size: 15px; }
+  .ficha-archivo .meta { font-size: 12.5px; color: var(--texto-3); }
+  .ficha-archivo .acciones { margin-left: auto; display: flex; gap: 8px; }
+
+  /* ---------- inputs y botones ---------- */
+  label { display: block; font-size: 12.5px; color: var(--texto-2); margin-bottom: 6px; }
+  input[type="text"], input[type="number"] {
+    width: 100%; padding: 10px 12px;
+    background: var(--fondo); color: var(--texto);
+    border: 1px solid var(--borde); border-radius: 9px;
+    font: 600 16px/1 var(--mono);
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus { border-color: var(--verde); box-shadow: 0 0 0 3px rgba(53, 208, 127, .18); }
+  input::placeholder { color: var(--texto-3); font-weight: 400; }
+
+  .boton {
+    display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+    padding: 10px 18px; border-radius: 9px; border: 1px solid var(--borde);
+    background: var(--panel-2); color: var(--texto);
+    font: 600 14px system-ui, sans-serif; cursor: pointer;
+    transition: transform .05s, background .15s, border-color .15s, opacity .15s;
+    white-space: nowrap;
+  }
+  .boton:hover { border-color: var(--verde); }
+  .boton:active { transform: translateY(1px); }
+  .boton.primario {
+    background: linear-gradient(135deg, var(--verde-osc), var(--verde));
+    border-color: transparent; color: #06281a;
+  }
+  .boton.primario:hover { filter: brightness(1.08); }
+  .boton.peligro:hover { border-color: var(--rojo); color: var(--rojo); }
+  .boton:disabled { opacity: .38; cursor: not-allowed; }
+  .boton.chico { padding: 7px 12px; font-size: 12.5px; }
+
+  .fila { display: flex; gap: 10px; align-items: end; }
+  .fila > .crece { flex: 1; }
+
+  /* ---------- resultado de caja ---------- */
+  .resultado-caja { display: none; margin-top: 18px; }
+  .resultado-caja.visible { display: block; }
+  .valor-grande {
+    font: 700 38px/1.1 var(--mono);
+    color: var(--verde);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.5px;
+  }
+  .valor-grande small { font-size: 17px; color: var(--texto-2); font-weight: 500; }
+  .sub-valor { color: var(--texto-3); font-size: 13px; margin-top: 4px; font-family: var(--mono); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip {
+    font: 12.5px var(--mono);
+    background: var(--fondo); border: 1px solid var(--borde);
+    color: var(--texto-2); border-radius: 7px; padding: 4px 10px;
+  }
+  .chip b { color: var(--azul); font-weight: 600; }
+
+  details.hex { margin-top: 14px; }
+  details.hex summary {
+    cursor: pointer; font-size: 12.5px; color: var(--texto-3);
+    user-select: none; list-style: none;
+  }
+  details.hex summary::before { content: "▸ "; }
+  details.hex[open] summary::before { content: "▾ "; }
+  .volcado {
+    margin-top: 10px; padding: 12px 14px; overflow-x: auto;
+    background: var(--fondo); border: 1px solid var(--borde-suave); border-radius: 9px;
+    font: 12px/1.9 var(--mono); color: var(--texto-2); white-space: pre;
+  }
+  .volcado .off { color: var(--texto-3); }
+  .volcado .hit { color: var(--dorado); font-weight: 700; }
+
+  /* ---------- edición ---------- */
+  .sugerencias { display: grid; gap: 10px; margin: 4px 0 16px; }
+  .sugerencia {
+    text-align: left; width: 100%;
+    background: var(--fondo); border: 1px solid var(--borde); border-radius: 10px;
+    padding: 12px 14px; cursor: pointer; color: var(--texto);
+    transition: border-color .15s, background .15s;
+    font: inherit;
+  }
+  .sugerencia:hover { border-color: var(--verde); }
+  .sugerencia.elegida { border-color: var(--verde); background: rgba(53, 208, 127, .07); }
+  .sugerencia .nombre-op {
+    font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--verde);
+    font-weight: 700;
+  }
+  .sugerencia .monto { font: 700 19px var(--mono); margin: 3px 0 4px; font-variant-numeric: tabular-nums; }
+  .sugerencia .expl { font-size: 12.5px; color: var(--texto-2); line-height: 1.5; }
+
+  .medidor { margin: 10px 0 16px; }
+  .medidor .barra {
+    height: 8px; border-radius: 99px; overflow: hidden;
+    background: var(--fondo); border: 1px solid var(--borde-suave);
+  }
+  .medidor .relleno {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--verde), var(--dorado) 78%, var(--rojo));
+    transition: width .25s;
+  }
+  .medidor .leyenda { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--texto-3); margin-top: 5px; }
+
+  .aviso {
+    display: none; margin-top: 12px; padding: 10px 14px;
+    border-radius: 9px; font-size: 13px;
+    border: 1px solid;
+  }
+  .aviso.visible { display: block; }
+  .aviso.error { border-color: rgba(240, 97, 109, .4); background: rgba(240, 97, 109, .08); color: var(--rojo); }
+  .aviso.ok    { border-color: rgba(53, 208, 127, .4); background: rgba(53, 208, 127, .08); color: var(--verde); }
+  .aviso.info  { border-color: rgba(245, 196, 81, .4); background: rgba(245, 196, 81, .08); color: var(--dorado); }
+
+  /* ---------- panel lateral ---------- */
+  .lateral .item-mapa {
+    display: flex; gap: 12px; align-items: start;
+    padding: 12px 0; border-bottom: 1px solid var(--borde-suave);
+  }
+  .lateral .item-mapa:last-child { border-bottom: none; }
+  .insignia {
+    font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 6px; white-space: nowrap; margin-top: 2px;
+  }
+  .insignia.ok { background: rgba(53, 208, 127, .15); color: var(--verde); }
+  .insignia.investigando { background: rgba(245, 196, 81, .13); color: var(--dorado); }
+  .insignia.pendiente { background: rgba(100, 118, 156, .18); color: var(--texto-3); }
+  .item-mapa .titulo-item { font-size: 14px; font-weight: 600; }
+  .item-mapa .desc-item { font-size: 12.5px; color: var(--texto-2); margin-top: 2px; line-height: 1.5; }
+
+  footer {
+    max-width: 1100px; margin: 0 auto; padding: 10px 28px 34px;
+    font-size: 12px; color: var(--texto-3); text-align: center;
+  }
+  footer code { font-family: var(--mono); color: var(--texto-2); }
+
+  /* ---------- toast ---------- */
+  #toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+    background: var(--panel-2); border: 1px solid var(--borde);
+    color: var(--texto); padding: 11px 20px; border-radius: 10px;
+    font-size: 13.5px; box-shadow: var(--sombra);
+    opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+    max-width: 90vw;
+  }
+  #toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚽</div>
+  <div>
+    <h1>PCF <span>Toolkit</span></h1>
+    <div class="sub">PC Fútbol 6 · Edición Argentina · Apertura 98-99</div>
+  </div>
+  <div class="estado-archivo">
+    <span class="punto" id="punto-estado"></span>
+    <span id="texto-estado">Sin partida cargada</span>
+  </div>
+</header>
+
+<main>
+  <div><!-- columna principal -->
+
+    <section class="tarjeta">
+      <h2><span class="paso">1</span> Partida</h2>
+
+      <div class="zona-drop" id="zona-drop" role="button" tabindex="0"
+           aria-label="Abrir archivo de partida">
+        <span class="icono">📂</span>
+        <strong>Abrí tu partida</strong> — clic acá o arrastrá el archivo
+        <div class="pista">managXXX.XXX de la carpeta TACTICS del juego · se recomienda cerrar el juego antes de editar</div>
+      </div>
+      <input type="file" id="input-archivo" hidden>
+
+      <div class="ficha-archivo" id="ficha-archivo">
+        <div class="icono-doc">🗂️</div>
+        <div>
+          <div class="nombre" id="nombre-archivo"></div>
+          <div class="meta" id="meta-archivo"></div>
+        </div>
+        <div class="acciones">
+          <button class="boton chico" id="btn-backup" title="Descarga una copia intacta del archivo tal como se abrió">⬇ Backup del original</button>
+          <button class="boton chico peligro" id="btn-restaurar" title="Descarta todos los cambios en memoria">↩ Restaurar</button>
+          <button class="boton chico" id="btn-otro">Abrir otro…</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="tarjeta" id="seccion-caja" style="display:none">
+      <h2><span class="paso">2</span> Localizar la caja</h2>
+      <div class="fila">
+        <div class="crece">
+          <label for="input-pesos">Caja actual <b>exacta</b> según la pantalla de finanzas del juego (en $, sin puntos)</label>
+          <input type="text" id="input-pesos" inputmode="numeric" placeholder="755149" autocomplete="off">
+        </div>
+        <button class="boton primario" id="btn-localizar">🔍 Localizar</button>
+      </div>
+      <div class="aviso error" id="error-localizar"></div>
+
+      <div class="resultado-caja" id="resultado-caja">
+        <div style="margin-top:18px">
+          <div class="valor-grande"><span id="caja-pesos"></span> <small>$</small></div>
+          <div class="sub-valor" id="caja-pesetas"></div>
+          <div class="chips" id="chips-copias"></div>
+          <details class="hex">
+            <summary>Ver bytes en el archivo</summary>
+            <div class="volcado" id="volcado-hex"></div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="tarjeta" id="seccion-editar" style="display:none">
+      <h2><span class="paso">3</span> Editar</h2>
+
+      <div class="sugerencias" id="sugerencias"></div>
+
+      <label for="input-nueva">Valor a medida (en $)</label>
+      <div class="fila">
+        <div class="crece"><input type="text" id="input-nueva" inputmode="numeric" placeholder="7000000" autocomplete="off"></div>
+        <button class="boton primario" id="btn-aplicar" disabled>✏️ Aplicar</button>
+      </div>
+
+      <div class="medidor">
+        <div class="barra"><div class="relleno" id="medidor-relleno"></div></div>
+        <div class="leyenda">
+          <span>0 $</span>
+          <span id="medidor-texto">techo seguro: 14.316.557 $</span>
+        </div>
+      </div>
+
+      <div class="aviso" id="aviso-editar"></div>
+
+      <div class="fila" style="margin-top:16px">
+        <button class="boton primario crece" id="btn-guardar" disabled>💾 Guardar en el archivo</button>
+      </div>
+      <div class="aviso info" id="nota-guardado" style="margin-top:10px"></div>
+    </section>
+
+  </div>
+
+  <aside class="lateral"><!-- columna secundaria -->
+    <section class="tarjeta">
+      <h2>Mapa del formato</h2>
+      <div class="item-mapa">
+        <span class="insignia ok">Confirmado</span>
+        <div>
+          <div class="titulo-item">Caja del club</div>
+          <div class="desc-item">Double LE en pesetas, 3 copias. El juego muestra $ = pta ÷ 150. Confirmado con diff entre saves reales.</div>
+        </div>
+      </div>
+      <div class="item-mapa">
+        <span class="insignia ok">Confirmado</span>
+        <div>
+          <div class="titulo-item">Textos</div>
+          <div class="desc-item">Ofuscados con XOR 0x61, prefijo de largo uint16 LE. Nombres de DT en ASCII plano.</div>
+        </div>
+      </div>
+      <div class="item-mapa">
+        <span class="insignia investigando">En investigación</span>
+        <div>
+          <div class="titulo-item">Estadio</div>
+          <div class="desc-item">Candidatos de aforo detectados (20.000 / 2.200). Falta contrastar con la pantalla del juego.</div>
+        </div>
+      </div>
+      <div class="item-mapa">
+        <span class="insignia investigando">En investigación</span>
+        <div>
+          <div class="titulo-item">Jugadores</div>
+          <div class="desc-item">Atributos aparentemente en binario crudo junto al nombre. Falta confirmar contra fichas del juego.</div>
+        </div>
+      </div>
+      <div class="item-mapa">
+        <span class="insignia pendiente">Pendiente</span>
+        <div>
+          <div class="titulo-item">Cláusulas y contratos</div>
+          <div class="desc-item">Sin empezar.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tarjeta" style="margin-top:22px">
+      <h2>Reglas de seguridad</h2>
+      <div class="desc-item" style="font-size:12.5px; color:var(--texto-2); line-height:1.7">
+        · Editá siempre <b>con el juego cerrado</b>.<br>
+        · El techo de <b>14.316.557 $</b> (2.147M pta) evita el overflow del contador interno del juego — el editor no deja pasarlo.<br>
+        · La edición cambia <b>solo los bytes de la caja</b>: el resto del archivo queda byte a byte idéntico.<br>
+        · Antes de guardar podés bajarte un <b>backup del original</b>; «Restaurar» descarta los cambios en memoria.
+      </div>
+    </section>
+  </aside>
+</main>
+
+<footer>
+  PCF Toolkit · valores internos en pesetas (motor español de Dinamic) · <code>$ mostrados = pesetas ÷ 150</code> · la lógica canónica vive en <code>src/core/caja.ts</code>
+</footer>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* ============================================================================
+   Lógica de caja — port de src/core/caja.ts y src/advisor/suggestions.ts.
+   Si se toca la lógica, actualizar AMBOS lados (el TS es la fuente de verdad
+   y tiene los tests).
+   ============================================================================ */
+const PESETAS_POR_PESO = 150;
+const TECHO_PESETAS = 2147483647;
+const TECHO_PESOS = Math.trunc(TECHO_PESETAS / PESETAS_POR_PESO); // 14.316.557
+
+const fmt = new Intl.NumberFormat('es-AR');
+const fmtDec = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 3 });
+
+function localizarCaja(buf, pesosMostrados) {
+  if (!Number.isInteger(pesosMostrados) || pesosMostrados < 0) {
+    throw new Error('La caja tiene que ser un número entero ≥ 0, tal como lo muestra el juego.');
+  }
+  const vista = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const min = pesosMostrados * PESETAS_POR_PESO;
+  const max = (pesosMostrados + 1) * PESETAS_POR_PESO;
+  const grupos = new Map();
+  for (let offset = 0; offset <= buf.length - 8; offset++) {
+    const valor = vista.getFloat64(offset, true);
+    if (valor >= min && valor < max) {
+      let clave = '';
+      for (let j = 0; j < 8; j++) clave += buf[offset + j].toString(16).padStart(2, '0');
+      const grupo = grupos.get(clave);
+      if (grupo) grupo.offsets.push(offset);
+      else grupos.set(clave, { offsets: [offset], valor });
+    }
+  }
+  if (grupos.size === 0) {
+    throw new Error('No encontré ninguna caja de ' + fmt.format(pesosMostrados) +
+      ' $. Verificá el número exacto en la pantalla de finanzas (y que la partida sea la última guardada).');
+  }
+  let candidatos = [...grupos.values()];
+  if (candidatos.length > 1) {
+    const conCopias = candidatos.filter((g) => g.offsets.length >= 2);
+    if (conCopias.length !== 1) {
+      throw new Error('Ambiguo: hay varios valores compatibles en el archivo. Jugá una semana más, guardá y volvé a intentar.');
+    }
+    candidatos = conCopias;
+  }
+  const g = candidatos[0];
+  return { offsets: g.offsets, pesetas: g.valor, pesos: Math.trunc(g.valor / PESETAS_POR_PESO) };
+}
+
+function escribirCaja(buf, offsets, nuevaPesetas) {
+  if (!Number.isFinite(nuevaPesetas) || nuevaPesetas <= 0 || nuevaPesetas > TECHO_PESETAS) {
+    throw new Error('Valor fuera del rango seguro.');
+  }
+  const vista = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  for (const offset of offsets) vista.setFloat64(offset, nuevaPesetas, true);
+}
+
+function sugerirCaja(cajaActualPesos) {
+  const redondear = (p) => Math.floor(p / 50000) * 50000;
+  const discreta = Math.min(Math.max(redondear(cajaActualPesos * 5), 1000000), 2000000);
+  return [
+    { nombre: 'discreta', pesos: discreta,
+      expl: 'Como una buena venta de jugador. No rompe la escala de la divisional: el desafío deportivo se mantiene.' },
+    { nombre: 'holgada', pesos: 7000000,
+      expl: 'Plata de sobra para fichar y ampliar el estadio durante temporadas, con la mitad del techo libre.' },
+    { nombre: 'al límite', pesos: redondear(TECHO_PESOS * 0.95),
+      expl: 'Máximo prudente: 95% del techo de overflow. El 5% restante es colchón para ingresos semanales.' },
+  ];
+}
+
+/* ============================================================================
+   Estado y elementos
+   ============================================================================ */
+const $ = (id) => document.getElementById(id);
+const estado = {
+  handle: null,       // FileSystemFileHandle si el navegador lo soporta
+  nombre: '',
+  original: null,     // Uint8Array intacto tal como se abrió
+  buffer: null,       // Uint8Array editable
+  caja: null,         // resultado de localizarCaja
+  sucio: false,       // hay cambios sin guardar
+};
+const soportaFS = 'showOpenFilePicker' in window;
+
+function toast(mensaje) {
+  const t = $('toast');
+  t.textContent = mensaje;
+  t.classList.add('visible');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => t.classList.remove('visible'), 3500);
+}
+
+function ponerEstado(texto, clase) {
+  $('texto-estado').textContent = texto;
+  $('punto-estado').className = 'punto' + (clase ? ' ' + clase : '');
+}
+
+/* ============================================================================
+   Apertura de archivo
+   ============================================================================ */
+async function cargarDesdeFile(file, handle) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  estado.handle = handle ?? null;
+  estado.nombre = file.name;
+  estado.original = bytes.slice();
+  estado.buffer = bytes;
+  estado.caja = null;
+  estado.sucio = false;
+
+  $('zona-drop').style.display = 'none';
+  $('ficha-archivo').classList.add('visible');
+  $('nombre-archivo').textContent = file.name;
+  $('meta-archivo').textContent = fmt.format(bytes.length) + ' bytes · ' +
+    (estado.handle ? 'guardado directo disponible' : 'sin acceso directo: al guardar se descarga el archivo');
+  $('seccion-caja').style.display = '';
+  $('seccion-editar').style.display = 'none';
+  $('resultado-caja').classList.remove('visible');
+  $('input-pesos').value = '';
+  ocultar('error-localizar');
+  ponerEstado(file.name, 'ok');
+  $('nota-guardado').textContent = estado.handle
+    ? 'Al guardar se escribe directo sobre ' + file.name + ' (el navegador te va a pedir permiso la primera vez).'
+    : 'Este navegador no permite escribir el archivo en el lugar: al guardar se descarga ' + file.name + ' y lo copiás vos a la carpeta TACTICS.';
+  $('nota-guardado').classList.add('visible');
+  $('input-pesos').focus();
+}
+
+async function abrirConPicker() {
+  try {
+    if (soportaFS) {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: 'Partida PC Fútbol (managXXX.XXX)' }],
+      });
+      await cargarDesdeFile(await handle.getFile(), handle);
+    } else {
+      $('input-archivo').click();
+    }
+  } catch (e) {
+    if (e && e.name !== 'AbortError') toast('No pude abrir el archivo: ' + e.message);
+  }
+}
+
+$('zona-drop').addEventListener('click', abrirConPicker);
+$('zona-drop').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') abrirConPicker(); });
+$('btn-otro').addEventListener('click', () => {
+  if (estado.sucio && !confirm('Hay cambios sin guardar. ¿Abrir otro archivo igual?')) return;
+  location.reload();
+});
+$('input-archivo').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) cargarDesdeFile(file, null);
+});
+
+document.addEventListener('dragover', (e) => { e.preventDefault(); $('zona-drop').classList.add('encima'); });
+document.addEventListener('dragleave', () => $('zona-drop').classList.remove('encima'));
+document.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  $('zona-drop').classList.remove('encima');
+  const item = e.dataTransfer.items && e.dataTransfer.items[0];
+  if (!item) return;
+  let handle = null;
+  if (item.getAsFileSystemHandle) {
+    try { handle = await item.getAsFileSystemHandle(); } catch { /* sin permiso: seguimos sin handle */ }
+    if (handle && handle.kind !== 'file') handle = null;
+  }
+  const file = handle ? await handle.getFile() : item.getAsFile();
+  if (file) cargarDesdeFile(file, handle);
+});
+
+/* ============================================================================
+   Localizar caja
+   ============================================================================ */
+function mostrar(id, mensaje, clase) {
+  const el = $(id);
+  el.textContent = mensaje;
+  el.className = 'aviso visible ' + (clase || 'error');
+}
+function ocultar(id) { $(id).className = $(id).className.replace(' visible', '').replace('visible', ''); }
+
+function volcadoHex(offset) {
+  // 3 filas de 16 bytes alrededor de la copia, con los 8 bytes de caja resaltados
+  const inicio = Math.max(0, (offset & ~15) - 16);
+  let html = '';
+  for (let fila = inicio; fila < inicio + 48 && fila < estado.buffer.length; fila += 16) {
+    html += '<span class="off">0x' + fila.toString(16).toUpperCase().padStart(6, '0') + '</span>  ';
+    for (let i = fila; i < fila + 16 && i < estado.buffer.length; i++) {
+      const hex = estado.buffer[i].toString(16).padStart(2, '0').toUpperCase();
+      html += (i >= offset && i < offset + 8) ? '<span class="hit">' + hex + '</span> ' : hex + ' ';
+    }
+    html += '\n';
+  }
+  return html;
+}
+
+$('btn-localizar').addEventListener('click', () => {
+  ocultar('error-localizar');
+  const texto = $('input-pesos').value.replace(/[.\s]/g, '');
+  const pesosMostrados = Number.parseInt(texto, 10);
+  try {
+    if (!estado.buffer) throw new Error('Primero abrí una partida.');
+    const caja = localizarCaja(estado.buffer, pesosMostrados);
+    estado.caja = caja;
+    $('caja-pesos').textContent = fmt.format(caja.pesos);
+    $('caja-pesetas').textContent = '= ' + fmtDec.format(caja.pesetas) + ' pesetas internas (double LE)';
+    $('chips-copias').innerHTML = caja.offsets
+      .map((o) => '<span class="chip">copia en <b>0x' + o.toString(16).toUpperCase() + '</b></span>')
+      .join('') + '<span class="chip">' + caja.offsets.length + (caja.offsets.length === 3 ? ' copias ✓' : ' copias ⚠ (se esperaban 3)') + '</span>';
+    $('volcado-hex').innerHTML = caja.offsets.map(volcadoHex).join('\n');
+    $('resultado-caja').classList.add('visible');
+    $('seccion-editar').style.display = '';
+    pintarSugerencias();
+    $('btn-guardar').disabled = !estado.sucio;
+    toast('Caja localizada: ' + caja.offsets.length + ' copias');
+  } catch (e) {
+    estado.caja = null;
+    $('resultado-caja').classList.remove('visible');
+    $('seccion-editar').style.display = 'none';
+    mostrar('error-localizar', e.message, 'error');
+  }
+});
+$('input-pesos').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-localizar').click(); });
+
+/* ============================================================================
+   Edición
+   ============================================================================ */
+function pintarSugerencias() {
+  const cont = $('sugerencias');
+  cont.innerHTML = '';
+  for (const op of sugerirCaja(estado.caja.pesos)) {
+    const boton = document.createElement('button');
+    boton.className = 'sugerencia';
+    boton.innerHTML = '<div class="nombre-op">' + op.nombre + '</div>' +
+      '<div class="monto">' + fmt.format(op.pesos) + ' $</div>' +
+      '<div class="expl">' + op.expl + '</div>';
+    boton.addEventListener('click', () => {
+      $('input-nueva').value = String(op.pesos);
+      cont.querySelectorAll('.sugerencia').forEach((b) => b.classList.remove('elegida'));
+      boton.classList.add('elegida');
+      validarNueva();
+    });
+    cont.appendChild(boton);
+  }
+  $('input-nueva').value = '';
+  ocultar('aviso-editar');
+  actualizarMedidor(estado.caja.pesos);
+  $('btn-aplicar').disabled = true;
+}
+
+function actualizarMedidor(pesosMostrados) {
+  const pct = Math.min(100, (pesosMostrados / TECHO_PESOS) * 100);
+  $('medidor-relleno').style.width = pct.toFixed(2) + '%';
+  $('medidor-texto').textContent = pct.toFixed(1) + '% del techo seguro (' + fmt.format(TECHO_PESOS) + ' $)';
+}
+
+function leerNueva() {
+  const texto = $('input-nueva').value.replace(/[.\s]/g, '');
+  return Number.parseInt(texto, 10);
+}
+
+function validarNueva() {
+  const nueva = leerNueva();
+  ocultar('aviso-editar');
+  if (!Number.isInteger(nueva) || nueva <= 0) { $('btn-aplicar').disabled = true; return; }
+  actualizarMedidor(nueva);
+  if (nueva > TECHO_PESOS) {
+    mostrar('aviso-editar', 'Supera el techo seguro de ' + fmt.format(TECHO_PESOS) + ' $ — riesgo de overflow del contador del juego. No se puede aplicar.', 'error');
+    $('btn-aplicar').disabled = true;
+    return;
+  }
+  if (nueva > TECHO_PESOS * 0.95) {
+    mostrar('aviso-editar', 'Muy cerca del techo: dejá margen para los ingresos semanales o el contador puede desbordar solo.', 'info');
+  }
+  $('btn-aplicar').disabled = false;
+}
+$('input-nueva').addEventListener('input', () => {
+  document.querySelectorAll('.sugerencia').forEach((b) => b.classList.remove('elegida'));
+  validarNueva();
+});
+$('input-nueva').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('btn-aplicar').disabled) $('btn-aplicar').click(); });
+
+$('btn-aplicar').addEventListener('click', () => {
+  const nueva = leerNueva();
+  try {
+    escribirCaja(estado.buffer, estado.caja.offsets, nueva * PESETAS_POR_PESO);
+    const anterior = estado.caja.pesos;
+    estado.caja = { ...estado.caja, pesetas: nueva * PESETAS_POR_PESO, pesos: nueva };
+    estado.sucio = true;
+    $('caja-pesos').textContent = fmt.format(nueva);
+    $('caja-pesetas').textContent = '= ' + fmtDec.format(nueva * PESETAS_POR_PESO) + ' pesetas internas (double LE)';
+    $('volcado-hex').innerHTML = estado.caja.offsets.map(volcadoHex).join('\n');
+    $('btn-guardar').disabled = false;
+    ponerEstado(estado.nombre + ' — cambios sin guardar', 'sucio');
+    mostrar('aviso-editar', 'Aplicado en memoria: ' + fmt.format(anterior) + ' $ → ' + fmt.format(nueva) +
+      ' $ (' + estado.caja.offsets.length + ' copias). Falta guardar.', 'ok');
+  } catch (e) {
+    mostrar('aviso-editar', e.message, 'error');
+  }
+});
+
+/* ============================================================================
+   Guardado / backup / restaurar
+   ============================================================================ */
+function descargar(bytes, nombre) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+$('btn-guardar').addEventListener('click', async () => {
+  if (!estado.sucio) return;
+  try {
+    if (estado.handle) {
+      if ((await estado.handle.queryPermission({ mode: 'readwrite' })) !== 'granted' &&
+          (await estado.handle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
+        throw new Error('El navegador no dio permiso de escritura sobre el archivo.');
+      }
+      const escritor = await estado.handle.createWritable();
+      await escritor.write(estado.buffer);
+      await escritor.close();
+      toast('💾 Guardado directo en ' + estado.nombre);
+    } else {
+      descargar(estado.buffer, estado.nombre);
+      toast('⬇ Descargado como ' + estado.nombre + ' — copialo a la carpeta TACTICS');
+    }
+    estado.sucio = false;
+    $('btn-guardar').disabled = true;
+    ponerEstado(estado.nombre + ' — guardado', 'ok');
+  } catch (e) {
+    toast('Error al guardar: ' + e.message + (e.name === 'NoModificationAllowedError' ? ' (¿está abierto el juego?)' : ''));
+  }
+});
+
+$('btn-backup').addEventListener('click', () => {
+  descargar(estado.original, estado.nombre + '.bak');
+  toast('Backup descargado: ' + estado.nombre + '.bak');
+});
+
+$('btn-restaurar').addEventListener('click', () => {
+  if (estado.sucio && !confirm('Descartar todos los cambios en memoria y volver al archivo tal como se abrió?')) return;
+  estado.buffer = estado.original.slice();
+  estado.caja = null;
+  estado.sucio = false;
+  $('resultado-caja').classList.remove('visible');
+  $('seccion-editar').style.display = 'none';
+  $('input-pesos').value = '';
+  ocultar('error-localizar');
+  ponerEstado(estado.nombre, 'ok');
+  toast('Restaurado el contenido original (en memoria).');
+});
+
+window.addEventListener('beforeunload', (e) => {
+  if (estado.sucio) e.preventDefault();
+});
+</script>
+</body>
+</html>

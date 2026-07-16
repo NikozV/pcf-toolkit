@@ -57,7 +57,7 @@ Todo esto viene de foros de la comunidad, **no está verificado contra un archiv
 
 1. **Nunca asumas un offset como definitivo si no viene de `diff.ts` corrido contra un archivo real mío.** Si necesitás confirmar algo, pedime que genere el par de archivos (antes/después) en vez de adivinar.
 2. **Todo cambio en `offsets.json` va con una nota** de cómo se confirmó (qué operación se hizo en el juego, qué archivos se compararon).
-3. **Nunca escribas sobre el archivo original.** Todo comando de edición trabaja sobre una copia y pide confirmación antes de sobrescribir.
+3. **Nunca pierdas el archivo original.** (Actualizado 2026-07-16 a pedido del usuario:) los comandos de edición guardan directo sobre el archivo de la partida, pero SIEMPRE creando antes un backup automático (`<archivo>.bak-<timestamp>` en el CLI; en la web, copia del original en memoria con botones de backup/restaurar). `--salida` permite escribir a otra ruta sin tocar el original.
 4. El **advisor** (sugerencias de plata) es el corazón del proyecto: no es "poné cualquier número", es calcular un rango razonable según el techo de overflow conocido, el tipo de operación (aumentar aforo vs. clausula de jugador vs. plata en caja directa) y devolver 2-3 opciones con explicación corta de cada una (igual que el patrón de "variantes con trade-offs" que uso en otras herramientas).
 5. Preferí commits chicos y funcionales por fase, no todo junto.
 6. Comentarios de código y mensajes de CLI en español (uso este proyecto en español, es para mí).
