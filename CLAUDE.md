@@ -51,7 +51,7 @@ Todo esto viene de foros de la comunidad, **no está verificado contra un archiv
 - Límite conocido: los ingresos por partido/semana se guardan en un rango que se da vuelta (overflow) pasando ~2.147 millones — hay que respetar ese techo al sugerir valores.
 - **Bloque de jugador**: temporada actual = velocidad, resistencia, agresividad, calidad, regate, remate, pase, tiro, entradas, portero, moral, forma, energía (1 byte cada uno) + bloque similar para "próxima temporada" + altura, peso, fecha de nacimiento (día 1 byte, mes 1 byte, año 2 bytes little-endian).
 - **Plata del club**: offset todavía NO identificado. Hay que descubrirlo con `diff.ts` (guardar antes y después de una operación conocida, ej. vender un jugador por X millones, y buscar qué offset cambió exactamente en esa cantidad).
-- El texto de mensajes (ofertas, "millones") está en ASCII plano dentro del archivo y es buscable directamente.
+- ~~El texto de mensajes (ofertas, "millones") está en ASCII plano dentro del archivo y es buscable directamente.~~ **Desmentido para PCF6** (confirmado 2026-07-16 contra `fixtures/manag003-inicial.000`): los strings están ofuscados con **XOR 0x61** byte a byte (decodificado aparecen "F.C. Barcelona", "Patrick KLUIVERT", "GUARDIOLA", etc.). Los campos numéricos (atributos, y presumiblemente la plata) parecen guardarse en binario crudo, sin XOR. Detalle en `data/offsets.json` → `pcf6.codificacion_texto`.
 
 ## Cómo trabajar en este proyecto (reglas para Claude Code)
 

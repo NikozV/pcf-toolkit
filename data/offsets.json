@@ -44,7 +44,16 @@
       }
     },
     "pcf6": {
-      "_nota": "Sin datos propios todavía. Se asume estructura similar a pcf5 hasta tener fixtures reales de esta edición."
+      "_nota": "Datos de la edición Argentina 'Apertura 98-99' (archivos managXXX.XXX en carpeta TACTICS).",
+      "codificacion_texto": {
+        "estado": "confirmado",
+        "clave_xor": 97,
+        "nota": "Confirmado 2026-07-16 contra fixtures/manag003-inicial.000 (partida recién creada, PCF6 Apertura 98-99): los strings están ofuscados con XOR 0x61 byte a byte. Decodificando el archivo completo aparecen 'F.C. Barcelona', 'Camp Nou', 'Patrick KLUIVERT', 'GUARDIOLA', 'LUIS ENRIQUE', 'Emmanuel AMUNIKE', 'Estadio', 'RIQUELME', 'PALERMO', 'SAVIOLA'. En el archivo original, sin decodificar, esas palabras NO aparecen. Excepción notable: 'Van Gaal' aparece en ASCII plano en 0x183 (¿strings ingresados por el usuario se guardan sin ofuscar?)."
+      },
+      "atributos_jugador_crudos": {
+        "estado": "hipotesis",
+        "nota": "Junto a cada nombre decodificado hay corridas de 8-13 bytes con valores ~40..95 (ej. 87,82,80,89,81,81,77,83 junto a Amunike) que parecen ser los atributos SIN ofuscar (binario crudo). Falta confirmar contra los valores visibles en el juego. Implicación para la búsqueda de plata: los campos numéricos estarían crudos, así que la plata se busca como int32 LE directo sobre el archivo sin decodificar."
+      }
     }
   }
 }
