@@ -66,9 +66,13 @@
         "estado": "hipotesis-fuerte",
         "nota": "En 0x21233C, justo antes del double de caja, aparece 03 08 CE 07 = 3-8-1998 (día uint8, mes uint8, año uint16 LE) — coincide con el lunes de la semana 1 del torneo del fixture (semana 3 actual = 17-8 al 23-8-1998, según captura). Primera evidencia real del formato de fecha descripto por los foros."
       },
-      "estadio_candidatos": {
-        "estado": "hipotesis",
-        "nota": "En el registro de San Martín (Mza): int32 20.000 en 0x2120C5 (aparece de nuevo en 0x2121A7 tras el nombre del DT) y 2.200 en 0x2120CD — candidatos a aforo del estadio (¿de pie/sentados?). Falta contrastar con la pantalla de estadio del juego."
+      "registro_club": {
+        "estado": "verificado-multiclub",
+        "nota": "Estructura del registro de club (verificada 2026-07-16 contra 5 clubes en fixtures/manag003-semana4.000 + pantalla de estadio del juego): 3 strings con prefijo de largo uint16 LE + XOR 0x61 (nombre corto, nombre del estadio, nombre largo), seguidas de un bloque fijo. Bloque post-strings: +0 uint16 LE año de fundación (Barcelona 1899 ✓, Real Madrid 1902 ✓, San Martín SJ 1907 ✓, San Martín Tuc 1909 ✓, San Martín Mza 1927), +12 int32 LE CAPACIDAD del estadio (Mza 20.000 = pantalla ✓, Barcelona 120.000 Camp Nou ✓, Real Madrid 87.000 ✓, Tuc 25.000, SJ 15.000). +20 int32 desconocido (Mza 2.200; NO es parking, la pantalla muestra parking 0). Para pasar a 'confirmado' con diff: hacer una remodelación de estadio en el juego y comparar saves (de paso salen los campos de obras: por_pagar/semanas)."
+      },
+      "curiosidades_encoding": {
+        "estado": "anotado",
+        "nota": "Los nombres de DT de club están en ASCII plano ('Van Gaal' Barcelona en 0x183, 'Ragusa' San Martín Mza). Hay además una sección (~0x241CB6 en semana 4) con nombres de jugadores en ASCII plano (Coudet, Tuzzio, Saric de River) — distinta del bloque principal XOReado. El nombre del mánager del usuario ('Vassallo, Nico') NO aparece en manag003.000 ni plano ni XOR 0x61, ni en partido.dat: debe vivir en otro archivo del juego."
       }
     }
   }
