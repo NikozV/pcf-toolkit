@@ -1,0 +1,50 @@
+{
+  "_nota": "Mapa del conocimiento del formato de partida. Cada entrada tiene un 'estado': 'hipotesis' = viene de foros de la comunidad, SIN verificar contra un archivo real; 'confirmado' = verificado con diff.ts contra archivos reales (la nota dice cómo). Regla del proyecto: nada pasa a 'confirmado' sin esa nota.",
+  "ediciones": {
+    "pcf5": {
+      "estadio": {
+        "estado": "hipotesis",
+        "fuente": "Foros PCFutbolMania / CEZ Forums",
+        "offsetAbsoluto": null,
+        "nota": "Estructura relativa del bloque por equipo; el offset absoluto de cada equipo está pendiente de descubrir con diff.ts.",
+        "estructuraRelativa": [
+          { "campo": "espectadores_sentados", "tipo": "int32le", "bytes": 4 },
+          { "campo": "espectadores_de_pie", "tipo": "int32le", "bytes": 4 },
+          { "campo": "parking", "tipo": "int32le", "bytes": 4 },
+          { "campo": "equipamiento", "tipo": "desconocido", "bytes": 5 },
+          { "campo": "servicios", "tipo": "desconocido", "bytes": 4 },
+          { "campo": "ampliacion", "tipo": "uint8", "bytes": 1 },
+          { "campo": "espectadores_a_ampliar", "tipo": "uint8", "bytes": 1 },
+          { "campo": "semanas_restantes", "tipo": "uint8", "bytes": 1 }
+        ]
+      },
+      "jugador": {
+        "estado": "hipotesis",
+        "fuente": "Foros PCFutbolMania / CEZ Forums",
+        "offsetAbsoluto": null,
+        "nota": "Atributos de 1 byte cada uno, temporada actual + bloque similar de próxima temporada, más datos físicos. Orden exacto y offset absoluto pendientes de confirmar.",
+        "atributosTemporadaActual": [
+          "velocidad", "resistencia", "agresividad", "calidad", "regate",
+          "remate", "pase", "tiro", "entradas", "portero", "moral", "forma", "energia"
+        ],
+        "datosFisicos": [
+          { "campo": "altura", "tipo": "uint8", "bytes": 1 },
+          { "campo": "peso", "tipo": "uint8", "bytes": 1 },
+          { "campo": "fecha_nacimiento", "tipo": "fecha", "bytes": 4, "detalle": "día uint8, mes uint8, año uint16le" }
+        ]
+      },
+      "plata_club": {
+        "estado": "desconocido",
+        "offsetAbsoluto": null,
+        "nota": "Pendiente de descubrir: diff entre partida guardada antes y después de una venta de jugador por monto conocido."
+      },
+      "limites": {
+        "techo_overflow_dinero": 2147483647,
+        "nota": "Los contadores de dinero parecen ser int32 con signo: superar ~2.147 millones da overflow a negativo. Respetar este techo en el advisor."
+      }
+    },
+    "pcf6": {
+      "_nota": "Sin datos propios todavía. Se asume estructura similar a pcf5 hasta tener fixtures reales de esta edición."
+    }
+  }
+}

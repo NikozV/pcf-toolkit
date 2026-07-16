@@ -1,0 +1,22 @@
+{
+  "name": "pcf-toolkit",
+  "version": "0.1.0",
+  "description": "Editor inteligente de partidas guardadas de PC Fútbol 5.0 / 6.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pcf": "tsx src/cli/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0"
+  }
+}

@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>PCF·EDITOR — Editor de partidas PC Fútbol</title>
+<style>
+  :root{
+    --bg:            #0a1730;
+    --bg-panel:      #10214a;
+    --bg-panel-2:    #142a5c;
+    --line:          #24407a;
+    --text:          #e7ecff;
+    --text-dim:      #8fa3d4;
+    --amber:         #f0b429;
+    --teal:          #34d0c4;
+    --red:           #ff6b6b;
+    --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", "SF Mono", Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+  }
+  body{
+    background-image:
+      radial-gradient(circle at 20% 0%, rgba(52,208,196,0.07), transparent 40%),
+      radial-gradient(circle at 90% 10%, rgba(240,180,41,0.06), transparent 45%);
+  }
+  .scanlines{
+    position:fixed; inset:0; pointer-events:none; z-index:50;
+    background:repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 3px);
+    mix-blend-mode:overlay; opacity:0.5;
+  }
+  .wrap{ max-width:1080px; margin:0 auto; padding:28px 20px 60px; }
+
+  header.top{
+    display:flex; align-items:baseline; justify-content:space-between;
+    border-bottom:1px solid var(--line); padding-bottom:14px; margin-bottom:18px;
+    flex-wrap:wrap; gap:8px;
+  }
+  .brand{ display:flex; align-items:baseline; gap:10px; }
+  .brand .mark{
+    font-family:var(--mono); font-weight:700; letter-spacing:2px;
+    color:var(--bg); background:var(--amber); padding:3px 8px; border-radius:3px; font-size:13px;
+  }
+  .brand h1{ font-size:19px; margin:0; font-weight:600; letter-spacing:0.3px; }
+  .brand small{ color:var(--text-dim); font-family:var(--mono); font-size:12px; }
+  .filebadge{ font-family:var(--mono); font-size:12px; color:var(--teal); }
+
+  .panel{
+    background:var(--bg-panel); border:1px solid var(--line); border-radius:10px;
+    padding:16px 18px; margin-bottom:16px;
+  }
+  .panel h2{
+    margin:0 0 12px; font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--text-dim); font-weight:700;
+  }
+
+  .drop{
+    border:1.5px dashed var(--line); border-radius:10px; padding:26px;
+    text-align:center; color:var(--text-dim); cursor:pointer; transition:0.15s;
+  }
+  .drop:hover, .drop.drag{ border-color:var(--teal); color:var(--text); background:rgba(52,208,196,0.05); }
+  .drop b{ color:var(--amber); }
+  input[type=file]{ display:none; }
+
+  .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  button{
+    font-family:var(--sans); font-size:13px; font-weight:600;
+    background:var(--bg-panel-2); color:var(--text); border:1px solid var(--line);
+    border-radius:7px; padding:8px 13px; cursor:pointer; transition:0.12s;
+  }
+  button:hover:not(:disabled){ border-color:var(--teal); color:var(--teal); }
+  button:disabled{ opacity:0.35; cursor:not-allowed; }
+  button.primary{ background:var(--amber); color:#211500; border-color:var(--amber); }
+  button.primary:hover:not(:disabled){ filter:brightness(1.08); color:#211500; }
+  button.danger:hover:not(:disabled){ border-color:var(--red); color:var(--red); }
+
+  input[type=text], input[type=number]{
+    font-family:var(--mono); background:#0c1a38; color:var(--text);
+    border:1px solid var(--line); border-radius:6px; padding:7px 9px; font-size:13px;
+  }
+  select{
+    font-family:var(--sans); background:#0c1a38; color:var(--text);
+    border:1px solid var(--line); border-radius:6px; padding:7px 9px; font-size:13px;
+  }
+  .stat{ font-family:var(--mono); font-size:12px; color:var(--text-dim); }
+  .stat b{ color:var(--amber); }
+
+  .presets{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .preset{
+    font-family:var(--mono); font-size:11.5px; text-align:left; line-height:1.4;
+    background:#0c1a38; border:1px solid var(--line); border-radius:7px;
+    padding:8px 10px; max-width:230px; cursor:pointer;
+  }
+  .preset:hover{ border-color:var(--teal); }
+  .preset .k{ display:block; color:var(--amber); font-weight:700; margin-bottom:3px; }
+  .preset .d{ color:var(--text-dim); font-size:11px; }
+
+  .gridwrap{ overflow-x:auto; }
+  table.hex{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:12.5px; }
+  table.hex th{ color:var(--text-dim); font-weight:600; padding:4px 5px; text-align:center; font-size:11px; }
+  table.hex td{ padding:2px 4px; text-align:center; border-radius:3px; }
+  td.off{ color:var(--text-dim); padding-right:10px; text-align:left; }
+  td.byte{ cursor:pointer; color:var(--text); min-width:22px; }
+  td.byte:hover{ background:rgba(52,208,196,0.18); }
+  td.byte.sel{ background:var(--teal); color:#022; font-weight:700; }
+  td.byte.edited{ background:rgba(255,107,107,0.22); color:var(--red); font-weight:700; }
+  td.byte.edited.sel{ background:var(--red); color:#210; }
+  td.byte.match{ outline:1.5px solid var(--amber); }
+  td.ascii{ color:var(--text-dim); padding-left:12px; }
+  .pagebar{ display:flex; align-items:center; gap:10px; justify-content:center; margin-top:12px; flex-wrap:wrap;}
+
+  .inspector{ display:flex; gap:22px; flex-wrap:wrap; align-items:flex-end; }
+  .field{ display:flex; flex-direction:column; gap:4px; }
+  .field label{ font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; }
+  .field input{ width:90px; }
+
+  .log{ max-height:170px; overflow-y:auto; font-family:var(--mono); font-size:12px; }
+  .log-row{ display:flex; justify-content:space-between; padding:4px 2px; border-bottom:1px solid var(--line); }
+  .log-row span.o{ color:var(--text-dim); }
+  .log-row span.v{ color:var(--red); }
+  .log-empty{ color:var(--text-dim); font-style:italic; }
+
+  .warn{ font-size:12px; color:var(--text-dim); line-height:1.5; margin-top:2px; }
+  .warn b{ color:var(--amber); }
+
+  footer{ text-align:center; color:var(--text-dim); font-size:11.5px; margin-top:24px; }
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <span class="mark">PCF·EDITOR</span>
+      <div>
+        <h1>Editor de partidas — PC Fútbol 5.0 / 6.0</h1>
+        <small>hex editor casero · corre local en tu navegador</small>
+      </div>
+    </div>
+    <div class="filebadge" id="fileBadge">ningún archivo cargado</div>
+  </header>
+
+  <div class="panel" id="loadPanel">
+    <h2>1 · Cargar partida (managXXX.XXX de la carpeta TACTICS)</h2>
+    <label class="drop" id="drop">
+      Arrastrá tu archivo <b>managXXX.XXX</b> acá, o hacé click para elegirlo.
+      <input type="file" id="fileInput">
+    </label>
+    <p class="warn">El archivo no sale de tu computadora: se lee en memoria del navegador. Igual, guardá una copia del archivo original aparte antes de tocar nada — si algo sale mal, con "Reiniciar" volvés a la versión cargada, pero si cerrás la pestaña se pierde.</p>
+  </div>
+
+  <div class="panel" id="toolsPanel" style="display:none;">
+    <h2>2 · Acciones</h2>
+    <div class="row">
+      <button class="primary" id="btnDownload">⬇ Descargar archivo editado</button>
+      <button id="btnReset">↺ Reiniciar cambios</button>
+      <span class="stat">bytes editados: <b id="editCount">0</b></span>
+      <span class="stat">tamaño: <b id="fileSize">0</b> bytes</span>
+    </div>
+  </div>
+
+  <div class="panel" id="searchPanel" style="display:none;">
+    <h2>3 · Buscar (texto o secuencia hex)</h2>
+    <div class="row">
+      <select id="searchMode">
+        <option value="ascii">Texto (ASCII)</option>
+        <option value="hex">Hex (ej: C4;09;00;00)</option>
+      </select>
+      <input type="text" id="searchQuery" placeholder="ej: millones" style="min-width:220px;">
+      <button id="btnSearch">Buscar</button>
+      <button id="btnNextMatch" disabled>Siguiente coincidencia →</button>
+      <span class="stat" id="matchInfo"></span>
+    </div>
+    <div class="presets" id="presets"></div>
+  </div>
+
+  <div class="panel" id="gridPanel" style="display:none;">
+    <h2>4 · Vista hexadecimal</h2>
+    <div class="gridwrap"><table class="hex" id="hexTable"></table></div>
+    <div class="pagebar">
+      <button id="btnPrevPage">← página anterior</button>
+      <span class="stat" id="pageInfo">página 1/1</span>
+      <button id="btnNextPage">página siguiente →</button>
+      <span class="stat">ir al offset:</span>
+      <input type="text" id="jumpOffset" style="width:100px;" placeholder="0x0 o 100">
+      <button id="btnJump">Ir</button>
+    </div>
+  </div>
+
+  <div class="panel" id="inspectorPanel" style="display:none;">
+    <h2>5 · Byte seleccionado</h2>
+    <div class="inspector">
+      <div class="field"><label>Offset</label><input type="text" id="insOffset" disabled></div>
+      <div class="field"><label>Hex</label><input type="text" id="insHex" maxlength="2"></div>
+      <div class="field"><label>Decimal</label><input type="number" id="insDec" min="0" max="255"></div>
+      <div class="field"><label>ASCII</label><input type="text" id="insAscii" maxlength="1"></div>
+      <button class="primary" id="btnApplyByte">Aplicar</button>
+    </div>
+  </div>
+
+  <div class="panel" id="logPanel" style="display:none;">
+    <h2>Registro de cambios</h2>
+    <div class="log" id="log"><div class="log-empty">sin cambios todavía</div></div>
+  </div>
+
+  <footer>Basado en la ingeniería inversa documentada por la comunidad de PCFutbolMania / CEZ Forums. Los offsets exactos varían según partida y versión — usá "Buscar" para ubicarlos en tu propio archivo antes de editar.</footer>
+</div>
+
+<script>
+const BYTES_PER_ROW = 16, ROWS_PER_PAGE = 24, PAGE_SIZE = BYTES_PER_ROW*ROWS_PER_PAGE;
+
+let bytes = null, original = null, fileName = "";
+let edited = new Map();
+let currentPage = 0;
+let selectedOffset = null;
+let searchMatches = [], matchIndex = -1;
+
+const $ = id => document.getElementById(id);
+
+const presets = [
+  {k:"Buscar 'millones'", d:"Ubica el texto de mensajes de ofertas (ASCII) para editarlo.", mode:"ascii", q:"millones"},
+  {k:"Patrón de aforo", d:"FF;FF;FF;FF;03 — marca de fin del bloque de espectadores del estadio.", mode:"hex", q:"FF;FF;FF;FF;03"},
+  {k:"Bytes de servicios", d:"02;FF;FF;03 — bloque de servicios del estadio (merchandising).", mode:"hex", q:"02;FF;FF;03"},
+  {k:"Byte de ampliación", d:"Buscá 01 cerca del bloque de aforo para activar la ampliación de estadio.", mode:"hex", q:"01"},
+];
+
+function renderPresets(){
+  const box = $("presets"); box.innerHTML = "";
+  presets.forEach(p=>{
+    const d = document.createElement("div");
+    d.className = "preset";
+    d.innerHTML = `<span class="k">${p.k}</span><span class="d">${p.d}</span>`;
+    d.onclick = ()=>{ $("searchMode").value = p.mode; $("searchQuery").value = p.q; doSearch(); };
+    box.appendChild(d);
+  });
+}
+renderPresets();
+
+function showPanels(){
+  ["toolsPanel","searchPanel","gridPanel","inspectorPanel","logPanel"].forEach(id=> $(id).style.display = "block");
+}
+
+function loadFile(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    const buf = new Uint8Array(e.target.result);
+    bytes = buf;
+    original = buf.slice();
+    fileName = file.name;
+    edited.clear();
+    currentPage = 0;
+    selectedOffset = null;
+    searchMatches = []; matchIndex = -1;
+    $("fileBadge").textContent = fileName + " · " + bytes.length + " bytes";
+    $("fileSize").textContent = bytes.length;
+    showPanels();
+    renderGrid(); renderInspector(); renderLog(); updateCounters();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+$("fileInput").addEventListener("change", e=>{ if(e.target.files[0]) loadFile(e.target.files[0]); });
+const drop = $("drop");
+["dragenter","dragover"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add("drag"); }));
+["dragleave","drop"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove("drag"); }));
+drop.addEventListener("drop", e=>{ if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+
+function totalPages(){ return Math.max(1, Math.ceil(bytes.length / PAGE_SIZE)); }
+
+function renderGrid(){
+  const table = $("hexTable");
+  const start = currentPage * PAGE_SIZE;
+  const end = Math.min(bytes.length, start + PAGE_SIZE);
+  let html = "<thead><tr><th>offset</th>";
+  for(let c=0;c<BYTES_PER_ROW;c++) html += `<th>${c.toString(16).padStart(2,"0")}</th>`;
+  html += "<th style='padding-left:12px;'>ascii</th></tr></thead><tbody>";
+
+  for(let rowStart=start; rowStart<end; rowStart+=BYTES_PER_ROW){
+    html += `<tr><td class="off">${rowStart.toString(16).padStart(8,"0")}</td>`;
+    let asciiStr = "";
+    for(let c=0;c<BYTES_PER_ROW;c++){
+      const off = rowStart+c;
+      if(off < end){
+        const val = bytes[off];
+        let cls = "byte";
+        if(edited.has(off)) cls += " edited";
+        if(off === selectedOffset) cls += " sel";
+        if(searchMatches.includes(off)) cls += " match";
+        html += `<td class="${cls}" data-off="${off}">${val.toString(16).padStart(2,"0")}</td>`;
+        asciiStr += (val>=32 && val<127) ? String.fromCharCode(val) : ".";
+      } else {
+        html += `<td></td>`;
+      }
+    }
+    html += `<td class="ascii">${asciiStr}</td></tr>`;
+  }
+  html += "</tbody>";
+  table.innerHTML = html;
+  $("pageInfo").textContent = `página ${currentPage+1}/${totalPages()}`;
+  $("btnPrevPage").disabled = currentPage === 0;
+  $("btnNextPage").disabled = currentPage >= totalPages()-1;
+}
+
+$("hexTable").addEventListener("click", e=>{
+  const td = e.target.closest("td.byte");
+  if(!td) return;
+  selectedOffset = parseInt(td.dataset.off, 10);
+  renderGrid(); renderInspector();
+});
+
+function renderInspector(){
+  const has = selectedOffset !== null && bytes;
+  $("insOffset").value = has ? "0x"+selectedOffset.toString(16) : "";
+  const val = has ? bytes[selectedOffset] : 0;
+  $("insHex").value = has ? val.toString(16).padStart(2,"0").toUpperCase() : "";
+  $("insDec").value = has ? val : "";
+  $("insAscii").value = has && val>=32 && val<127 ? String.fromCharCode(val) : "";
+  ["insHex","insDec","insAscii","btnApplyByte"].forEach(id=> $(id).disabled = !has);
+}
+
+$("insHex").addEventListener("input", ()=>{
+  const v = parseInt($("insHex").value, 16);
+  if(!isNaN(v)){ $("insDec").value = v; $("insAscii").value = (v>=32&&v<127)?String.fromCharCode(v):""; }
+});
+$("insDec").addEventListener("input", ()=>{
+  const v = parseInt($("insDec").value, 10);
+  if(!isNaN(v) && v>=0 && v<=255){ $("insHex").value = v.toString(16).padStart(2,"0").toUpperCase(); $("insAscii").value = (v>=32&&v<127)?String.fromCharCode(v):""; }
+});
+$("insAscii").addEventListener("input", ()=>{
+  const c = $("insAscii").value;
+  if(c.length===1){ const v = c.charCodeAt(0); $("insHex").value = v.toString(16).padStart(2,"0").toUpperCase(); $("insDec").value = v; }
+});
+
+$("btnApplyByte").addEventListener("click", ()=>{
+  if(selectedOffset===null) return;
+  const v = parseInt($("insHex").value, 16);
+  if(isNaN(v) || v<0 || v>255){ alert("Valor hex inválido (00–FF)"); return; }
+  bytes[selectedOffset] = v;
+  if(v === original[selectedOffset]) edited.delete(selectedOffset);
+  else edited.set(selectedOffset, {old: original[selectedOffset], now: v});
+  renderGrid(); renderLog(); updateCounters();
+});
+
+function renderLog(){
+  const box = $("log");
+  if(edited.size===0){ box.innerHTML = `<div class="log-empty">sin cambios todavía</div>`; return; }
+  const rows = [...edited.entries()].sort((a,b)=>a[0]-b[0]).map(([off,d])=>
+    `<div class="log-row"><span class="o">0x${off.toString(16)}</span><span>${d.old.toString(16).padStart(2,"0")} → </span><span class="v">${d.now.toString(16).padStart(2,"0")}</span></div>`
+  ).join("");
+  box.innerHTML = rows;
+}
+
+function updateCounters(){ $("editCount").textContent = edited.size; }
+
+$("btnReset").addEventListener("click", ()=>{
+  if(!original) return;
+  bytes = original.slice();
+  edited.clear();
+  selectedOffset = null;
+  renderGrid(); renderInspector(); renderLog(); updateCounters();
+});
+
+$("btnDownload").addEventListener("click", ()=>{
+  if(!bytes) return;
+  const blob = new Blob([bytes], {type:"application/octet-stream"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName || "manag_editado.bin";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+});
+
+$("btnPrevPage").addEventListener("click", ()=>{ if(currentPage>0){ currentPage--; renderGrid(); } });
+$("btnNextPage").addEventListener("click", ()=>{ if(currentPage<totalPages()-1){ currentPage++; renderGrid(); } });
+
+$("btnJump").addEventListener("click", ()=>{
+  let s = $("jumpOffset").value.trim();
+  let off = s.toLowerCase().startsWith("0x") ? parseInt(s,16) : parseInt(s,10);
+  if(isNaN(off) || off<0 || off>=bytes.length){ alert("Offset fuera de rango"); return; }
+  currentPage = Math.floor(off / PAGE_SIZE);
+  selectedOffset = off;
+  renderGrid(); renderInspector();
+});
+
+function parseHexQuery(q){
+  return q.split(/[;, ]+/).filter(x=>x.length).map(x=>parseInt(x,16));
+}
+function parseAsciiQuery(q){
+  return [...q].map(c=>c.charCodeAt(0));
+}
+
+function doSearch(){
+  if(!bytes) return;
+  const mode = $("searchMode").value;
+  const q = $("searchQuery").value;
+  if(!q){ return; }
+  const pattern = mode==="hex" ? parseHexQuery(q) : parseAsciiQuery(q);
+  if(pattern.some(isNaN) || pattern.length===0){ alert("Patrón inválido"); return; }
+
+  const matches = [];
+  for(let i=0;i<=bytes.length-pattern.length;i++){
+    let ok = true;
+    for(let j=0;j<pattern.length;j++){ if(bytes[i+j]!==pattern[j]){ ok=false; break; } }
+    if(ok) matches.push(i);
+  }
+  searchMatches = [];
+  matches.forEach(m=>{ for(let j=0;j<pattern.length;j++) searchMatches.push(m+j); });
+  matchIndex = 0;
+
+  $("matchInfo").textContent = matches.length ? `${matches.length} coincidencia(s)` : "sin coincidencias";
+  $("btnNextMatch").disabled = matches.length <= 1;
+
+  if(matches.length){
+    currentPage = Math.floor(matches[0] / PAGE_SIZE);
+    selectedOffset = matches[0];
+    renderGrid(); renderInspector();
+  }
+  window._matches = matches;
+}
+$("btnSearch").addEventListener("click", doSearch);
+$("searchQuery").addEventListener("keydown", e=>{ if(e.key==="Enter") doSearch(); });
+
+$("btnNextMatch").addEventListener("click", ()=>{
+  const matches = window._matches || [];
+  if(!matches.length) return;
+  matchIndex = (matchIndex+1) % matches.length;
+  currentPage = Math.floor(matches[matchIndex] / PAGE_SIZE);
+  selectedOffset = matches[matchIndex];
+  $("matchInfo").textContent = `coincidencia ${matchIndex+1}/${matches.length}`;
+  renderGrid(); renderInspector();
+});
+</script>
+</body>
+</html>

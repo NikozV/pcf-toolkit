@@ -1,0 +1,11 @@
+# Dependencias y builds
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Fixtures: partidas reales del juego, no se versionan
+fixtures/*
+!fixtures/.gitkeep
+
+# Configuración local de Claude Code
+.claude/settings.local.json

@@ -1,0 +1,3 @@
+# Configuración de pnpm: esbuild necesita su script de build (binario nativo de tsx/vitest)
+allowBuilds:
+  esbuild: true
