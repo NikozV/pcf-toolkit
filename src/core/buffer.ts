@@ -94,6 +94,25 @@ export function writeInt32LE(buf: Uint8Array, offset: number, valor: number): vo
   buf[offset + 3] = (valor >>> 24) & 0xff;
 }
 
+/**
+ * Double IEEE 754 de 8 bytes LE. Es el formato en que PCF6 guarda la plata
+ * (en pesetas), confirmado contra saves reales — ver data/offsets.json.
+ */
+export function readFloat64LE(buf: Uint8Array, offset: number): number {
+  verificarRango(buf, offset, 8);
+  const vista = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  return vista.getFloat64(offset, true);
+}
+
+export function writeFloat64LE(buf: Uint8Array, offset: number, valor: number): void {
+  verificarRango(buf, offset, 8);
+  if (!Number.isFinite(valor)) {
+    throw new RangeError(`Valor ${valor} inválido para float64: tiene que ser un número finito`);
+  }
+  const vista = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  vista.setFloat64(offset, valor, true);
+}
+
 // ---------------------------------------------------------------------------
 // Fechas
 // ---------------------------------------------------------------------------

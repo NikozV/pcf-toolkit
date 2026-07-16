@@ -6,8 +6,12 @@
  */
 
 import { Command } from 'commander';
+import { parse as parsearRuta, format as formatearRuta } from 'node:path';
 import { diffSaves, type RangoDiff } from '../reverse-engineering/diff';
 import { readInt32LE, readUint16LE, readUint32LE } from '../core/buffer';
+import { escribirCaja, localizarCaja, pesosAPesetas, TECHO_PESOS } from '../core/caja';
+import { SaveFile } from '../core/save-file';
+import { sugerirCaja } from '../advisor/suggestions';
 
 const programa = new Command();
 
@@ -92,6 +96,76 @@ programa
       console.log('');
     }
   });
+
+const pesos = (n: number): string => `${n.toLocaleString('es-AR')} $`;
+
+programa
+  .command('caja')
+  .description('Localiza la caja del club en un save de PCF6 y permite editarla (siempre sobre una copia)')
+  .argument('<archivo>', 'archivo de partida (managXXX.XXX)')
+  .requiredOption('--pesos <n>', 'caja actual EXACTA como la muestra la pantalla de finanzas del juego')
+  .option('--set <n>', 'nueva caja deseada, en pesos mostrados')
+  .option('--salida <ruta>', 'a dónde escribir la copia editada (default: <nombre>.editada.<ext> al lado del original)')
+  .option('--sobrescribir-original', 'CONFIRMACIÓN explícita para pisar el archivo de origen', false)
+  .action(
+    async (
+      archivo: string,
+      opciones: { pesos: string; set?: string; salida?: string; sobrescribirOriginal: boolean },
+    ) => {
+      const cajaMostrada = Number.parseInt(opciones.pesos, 10);
+      if (!Number.isInteger(cajaMostrada) || cajaMostrada < 0) {
+        programa.error('--pesos tiene que ser el número entero que muestra el juego (sin puntos)');
+      }
+
+      const save = await SaveFile.load(archivo);
+      const caja = localizarCaja(save.data, cajaMostrada);
+
+      console.log(`Caja localizada: ${pesos(caja.pesos)} = ${caja.pesetas.toLocaleString('es-AR')} pesetas internas`);
+      console.log(
+        `Copias encontradas: ${caja.offsets.length} → ${caja.offsets.map((o) => '0x' + o.toString(16).toUpperCase()).join(', ')}`,
+      );
+      if (caja.offsets.length !== 3) {
+        console.log(`⚠ Se esperaban 3 copias y hay ${caja.offsets.length}: revisar antes de confiar en la edición.`);
+      }
+
+      if (opciones.set === undefined) {
+        console.log('\nSugerencias (usá --set <pesos> para aplicar una):\n');
+        for (const opcion of sugerirCaja(caja.pesos)) {
+          console.log(`  ${opcion.nombre.padEnd(10)} ${pesos(opcion.pesos).padStart(14)} — ${opcion.explicacion}`);
+        }
+        return;
+      }
+
+      const nuevaPesos = Number.parseInt(opciones.set, 10);
+      if (!Number.isInteger(nuevaPesos) || nuevaPesos <= 0) {
+        programa.error('--set tiene que ser un entero positivo en pesos (sin puntos)');
+      }
+      if (nuevaPesos > TECHO_PESOS) {
+        programa.error(
+          `--set ${nuevaPesos.toLocaleString('es-AR')} supera el techo seguro de ${pesos(TECHO_PESOS)} (overflow del juego). No lo hago.`,
+        );
+      }
+
+      escribirCaja(save.data, caja.offsets, pesosAPesetas(nuevaPesos));
+
+      let destino: string;
+      if (opciones.sobrescribirOriginal) {
+        destino = archivo;
+      } else if (opciones.salida) {
+        destino = opciones.salida;
+      } else {
+        const partes = parsearRuta(archivo);
+        destino = formatearRuta({ dir: partes.dir, name: `${partes.name}.editada`, ext: partes.ext });
+      }
+      await save.write(destino, { sobrescribirOriginal: opciones.sobrescribirOriginal });
+
+      console.log(`\nListo: caja ${pesos(caja.pesos)} → ${pesos(nuevaPesos)} (${caja.offsets.length} copias actualizadas)`);
+      console.log(`Escrito en: ${destino}`);
+      if (!opciones.sobrescribirOriginal) {
+        console.log('El original queda intacto. Para usarlo en el juego, copialo sobre el archivo original (con el juego cerrado).');
+      }
+    },
+  );
 
 programa.parseAsync().catch((error: unknown) => {
   const mensaje = error instanceof Error ? error.message : String(error);

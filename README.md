@@ -17,15 +17,22 @@ pnpm install
 # Comparar dos partidas byte a byte (la herramienta central de reverse engineering)
 pnpm pcf diff partidaAntes.XXX partidaDespues.XXX
 
+# Ver la caja del club y sugerencias de edición (PCF6 Argentina)
+pnpm pcf caja fixtures/manag003.000 --pesos 755149
+
+# Editar la caja (escribe una copia .editada, nunca pisa el original)
+pnpm pcf caja fixtures/manag003.000 --pesos 755149 --set 7000000
+
 # Tests
 pnpm test
 ```
 
 ## Estado
 
-**Fase 1** (actual): capa de bajo nivel — lectura/escritura de bytes, carga segura de archivos, y `pcf diff`.
+- **Fase 1 lista**: capa de bajo nivel — lectura/escritura de bytes, carga segura de archivos, `pcf diff`.
+- **Caja del club (PCF6 Argentina) confirmada y editable**: se guarda como double LE en pesetas (el juego muestra pesos = pesetas/150) en 3 copias que se localizan por valor. `pcf caja` la encuentra, sugiere valores seguros bajo el techo de overflow (14.316.557 $) y edita sobre copia.
 
-Próximo paso: conseguir un par de partidas reales antes/después de una venta de jugador para ubicar el offset de la plata del club.
+Próximos pasos: bloque de estadio (candidatos ya anotados en `offsets.json`) y atributos de jugadores.
 
 ## Herramientas auxiliares
 
