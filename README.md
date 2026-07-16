@@ -17,12 +17,16 @@ pnpm install
 # Comparar dos partidas byte a byte (la herramienta central de reverse engineering)
 pnpm pcf diff partidaAntes.XXX partidaDespues.XXX
 
-# Ver la caja del club y sugerencias de edición (PCF6 Argentina)
-pnpm pcf caja fixtures/manag003.000 --pesos 755149
+# Ver la caja del club y sugerencias de edición (PCF6 Argentina).
+# La caja se auto-detecta (libro de balances): no hace falta ingresar el valor.
+pnpm pcf caja fixtures/manag003.000
 
 # Editar la caja: guarda directo sobre el archivo, con backup automático previo
 # (<archivo>.bak-<timestamp>). Con --salida escribe a otra ruta sin tocar el original.
-pnpm pcf caja fixtures/manag003.000 --pesos 755149 --set 7000000
+pnpm pcf caja fixtures/manag003.000 --set 50000000
+
+# Si la auto-detección falla (partida recién empezada), pasá el valor a mano:
+pnpm pcf caja fixtures/manag003.000 --pesos 755149
 
 # Tests
 pnpm test

@@ -9,7 +9,7 @@
  *   localiza escaneando por valor, no por offset fijo.
  */
 
-import { readFloat64LE, writeFloat64LE } from './buffer';
+import { readFloat64LE, writeFloat64LE, readFecha, type Fecha } from './buffer';
 
 /** Cambio interno pesetas → pesos de la edición Argentina (≈ pta/USD de 1998). */
 export const PESETAS_POR_PESO = 150;
@@ -142,4 +142,93 @@ export function escribirCaja(buf: Uint8Array, offsets: number[], nuevaPesetas: n
   for (const offset of offsets) {
     writeFloat64LE(buf, offset, nuevaPesetas);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-detección de la caja actual (sin conocer el valor mostrado)
+// ---------------------------------------------------------------------------
+
+export interface CajaDetectada {
+  pesetas: number;
+  pesos: number;
+  /** Cuántas semanas tiene el libro de balances detectado. */
+  semanas: number;
+  /** Fecha de la última entrada (la caja actual). */
+  fecha: Fecha;
+}
+
+/** Días aproximados desde 1998-01-01. No necesita exactitud de calendario:
+ * solo sirve para medir que dos fechas estén separadas ~1 semana. */
+function diasAprox(f: Fecha): number {
+  const acum = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+  const mes = f.mes >= 1 && f.mes <= 12 ? f.mes : 1;
+  return (f.anio - 1998) * 365 + acum[mes - 1]! + f.dia;
+}
+
+/**
+ * Detecta la caja actual del club del usuario SIN que haga falta ingresar el
+ * valor mostrado. Se apoya en el libro de balances: una tabla de entradas
+ * `[fecha (4 bytes)][caja (double LE, 8 bytes)]` con fechas semanales y stride
+ * de offset constante, que solo tiene el club que maneja el humano (los clubes
+ * IA no llevan libro semanal). La caja actual es la entrada de fecha más
+ * reciente de la cadena semanal más larga.
+ *
+ * Confirmado contra fixtures reales (semana 3 → 615.886 $, semana 4 → 755.149 $).
+ * Devuelve null si no encuentra una cadena de al menos 2 semanas (ej. partida
+ * recién empezada): en ese caso el caller cae al modo manual.
+ */
+export function detectarCajaActual(buf: Uint8Array): CajaDetectada | null {
+  interface Par {
+    off: number;
+    dias: number;
+    fecha: Fecha;
+    pesetas: number;
+  }
+
+  // 1) Recolectar todos los pares [fecha plausible][double de caja plausible].
+  const pares: Par[] = [];
+  for (let off = 0; off <= buf.length - 12; off++) {
+    const dia = buf[off]!;
+    const mes = buf[off + 1]!;
+    const anio = buf[off + 2]! | (buf[off + 3]! << 8);
+    if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || anio < 1998 || anio > 2010) continue;
+    const pesetas = readFloat64LE(buf, off + 4);
+    if (!Number.isFinite(pesetas) || pesetas < 100_000 || pesetas > TECHO_PESETAS) continue;
+    const fecha = readFecha(buf, off);
+    pares.push({ off, dias: diasAprox(fecha), fecha, pesetas });
+  }
+  if (pares.length < 2) return null;
+  pares.sort((a, b) => a.off - b.off);
+
+  // 2) Buscar la cadena más larga: entradas con stride de offset constante y
+  //    fechas separadas ~1 semana (descarta pares sueltos que son ruido).
+  const cerca = (a: number, b: number) => Math.abs(a - b) <= 4;
+  const esSemana = (d: number) => d >= 4 && d <= 10;
+  let mejor: Par[] = [];
+  for (let i = 0; i < pares.length; i++) {
+    for (let j = i + 1; j < pares.length; j++) {
+      const stride = pares[j]!.off - pares[i]!.off;
+      if (stride > 4096) break;
+      if (!esSemana(pares[j]!.dias - pares[i]!.dias)) continue;
+      const cadena = [pares[i]!, pares[j]!];
+      // Extender la cadena avanzando de a un stride, con fecha semanal.
+      for (;;) {
+        const ult = cadena[cadena.length - 1]!;
+        const sig = pares.find((p) => cerca(p.off, ult.off + stride) && esSemana(p.dias - ult.dias));
+        if (!sig) break;
+        cadena.push(sig);
+      }
+      if (cadena.length > mejor.length) mejor = cadena;
+    }
+  }
+  if (mejor.length < 2) return null;
+
+  // 3) La caja actual es la entrada de fecha más reciente de la cadena.
+  const ultima = mejor.reduce((a, b) => (b.dias > a.dias ? b : a));
+  return {
+    pesetas: ultima.pesetas,
+    pesos: pesetasAPesos(ultima.pesetas),
+    semanas: mejor.length,
+    fecha: ultima.fecha,
+  };
 }

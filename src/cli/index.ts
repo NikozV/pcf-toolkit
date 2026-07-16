@@ -9,7 +9,7 @@ import { Command } from 'commander';
 import { copyFile } from 'node:fs/promises';
 import { diffSaves, type RangoDiff } from '../reverse-engineering/diff';
 import { readInt32LE, readUint16LE, readUint32LE } from '../core/buffer';
-import { escribirCaja, localizarCaja, pesosAPesetas, TECHO_PESOS } from '../core/caja';
+import { detectarCajaActual, escribirCaja, localizarCaja, pesosAPesetas, TECHO_PESOS } from '../core/caja';
 import { SaveFile } from '../core/save-file';
 import { sugerirCaja } from '../advisor/suggestions';
 
@@ -103,20 +103,36 @@ programa
   .command('caja')
   .description('Localiza la caja del club en un save de PCF6 y permite editarla (siempre sobre una copia)')
   .argument('<archivo>', 'archivo de partida (managXXX.XXX)')
-  .requiredOption('--pesos <n>', 'caja actual EXACTA como la muestra la pantalla de finanzas del juego')
+  .option('--pesos <n>', 'caja actual EXACTA como la muestra el juego (opcional: por defecto se auto-detecta)')
   .option('--set <n>', 'nueva caja deseada, en pesos mostrados')
   .option('--salida <ruta>', 'escribir a otra ruta en vez de pisar el archivo (en ese caso no se hace backup)')
   .action(
     async (
       archivo: string,
-      opciones: { pesos: string; set?: string; salida?: string },
+      opciones: { pesos?: string; set?: string; salida?: string },
     ) => {
-      const cajaMostrada = Number.parseInt(opciones.pesos, 10);
-      if (!Number.isInteger(cajaMostrada) || cajaMostrada < 0) {
-        programa.error('--pesos tiene que ser el número entero que muestra el juego (sin puntos)');
+      const save = await SaveFile.load(archivo);
+
+      // Sin --pesos: auto-detectar la caja actual por el libro de balances.
+      let cajaMostrada: number;
+      if (opciones.pesos === undefined) {
+        const detectada = detectarCajaActual(save.data);
+        if (!detectada) {
+          programa.error(
+            'No pude auto-detectar la caja (partida muy al principio o formato distinto). ' +
+              'Pasá --pesos <valor> con la caja que muestra la pantalla de finanzas.',
+          );
+        }
+        cajaMostrada = detectada!.pesos;
+        const f = detectada!.fecha;
+        console.log(`Caja auto-detectada: ${pesos(cajaMostrada)} (libro de balances, ${detectada!.semanas} semanas, última al ${f.dia}-${f.mes}-${f.anio})`);
+      } else {
+        cajaMostrada = Number.parseInt(opciones.pesos, 10);
+        if (!Number.isInteger(cajaMostrada) || cajaMostrada < 0) {
+          programa.error('--pesos tiene que ser el número entero que muestra el juego (sin puntos)');
+        }
       }
 
-      const save = await SaveFile.load(archivo);
       const caja = localizarCaja(save.data, cajaMostrada);
 
       console.log(`Caja localizada: ${pesos(caja.pesos)} = ${caja.pesetas.toLocaleString('es-AR')} pesetas internas`);

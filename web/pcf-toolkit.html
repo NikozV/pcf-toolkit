@@ -366,16 +366,26 @@
     </section>
 
     <section class="tarjeta" id="seccion-caja" style="display:none">
-      <h2><span class="paso">2</span> Localizar la caja</h2>
-      <div class="fila">
-        <div class="crece">
-          <label for="input-pesos">Caja actual <b>exacta</b> según la pantalla de finanzas del juego (en $, sin puntos)</label>
-          <input type="text" id="input-pesos" inputmode="numeric" placeholder="755149"
-                 autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-caja-actual" readonly>
+      <h2><span class="paso">2</span> Tu caja</h2>
+
+      <!-- Auto-detección: se llena solo al cargar la partida -->
+      <div id="aviso-autodetec" class="aviso ok" style="display:none"></div>
+
+      <!-- Fallback manual: solo si no se pudo auto-detectar -->
+      <div id="bloque-manual" style="display:none">
+        <div class="aviso info visible" style="margin-bottom:12px">
+          No pude leer la caja sola (partida muy al principio o formato distinto). Ponela como la muestra la pantalla de finanzas del juego.
         </div>
-        <button class="boton primario" id="btn-localizar">🔍 Localizar</button>
+        <div class="fila">
+          <div class="crece">
+            <label for="input-pesos">Caja actual <b>exacta</b> (en $, sin puntos)</label>
+            <input type="text" id="input-pesos" inputmode="numeric" placeholder="755149"
+                   autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-caja-actual" readonly>
+          </div>
+          <button class="boton primario" id="btn-localizar">🔍 Localizar</button>
+        </div>
+        <div class="aviso error" id="error-localizar"></div>
       </div>
-      <div class="aviso error" id="error-localizar"></div>
 
       <div class="resultado-caja" id="resultado-caja">
         <div style="margin-top:18px">
@@ -427,7 +437,7 @@
         <span class="insignia ok">Confirmado</span>
         <div>
           <div class="titulo-item">Caja del club</div>
-          <div class="desc-item">Double LE en pesetas, 3 copias. El juego muestra $ = pta ÷ 150. Confirmado con diff entre saves reales.</div>
+          <div class="desc-item">Double LE en pesetas, 3 copias. El juego muestra $ = pta ÷ 150. Se auto-detecta por el libro de balances semanal, sin ingresar el valor.</div>
         </div>
       </div>
       <div class="item-mapa">
@@ -537,6 +547,48 @@ function escribirCaja(buf, offsets, nuevaPesetas) {
   }
   const vista = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   for (const offset of offsets) vista.setFloat64(offset, nuevaPesetas, true);
+}
+
+// Auto-detección de la caja actual sin conocer el valor (port de src/core/caja.ts).
+// Se apoya en el libro de balances: tabla [fecha 4b][caja double 8b] con fechas
+// semanales y stride de offset constante, exclusiva del club del usuario.
+function detectarCajaActual(buf) {
+  const vista = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const acum = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+  const diasAprox = (dia, mes, anio) => (anio - 1998) * 365 + acum[(mes >= 1 && mes <= 12 ? mes : 1) - 1] + dia;
+
+  const pares = [];
+  for (let off = 0; off <= buf.length - 12; off++) {
+    const dia = buf[off], mes = buf[off + 1], anio = buf[off + 2] | (buf[off + 3] << 8);
+    if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || anio < 1998 || anio > 2010) continue;
+    const pta = vista.getFloat64(off + 4, true);
+    if (!Number.isFinite(pta) || pta < 100000 || pta > TECHO_PESETAS) continue;
+    pares.push({ off, dias: diasAprox(dia, mes, anio), fecha: { dia, mes, anio }, pta });
+  }
+  if (pares.length < 2) return null;
+  pares.sort((a, b) => a.off - b.off);
+
+  const cerca = (a, b) => Math.abs(a - b) <= 4;
+  const esSemana = (d) => d >= 4 && d <= 10;
+  let mejor = [];
+  for (let i = 0; i < pares.length; i++) {
+    for (let j = i + 1; j < pares.length; j++) {
+      const stride = pares[j].off - pares[i].off;
+      if (stride > 4096) break;
+      if (!esSemana(pares[j].dias - pares[i].dias)) continue;
+      const cadena = [pares[i], pares[j]];
+      for (;;) {
+        const ult = cadena[cadena.length - 1];
+        const sig = pares.find((p) => cerca(p.off, ult.off + stride) && esSemana(p.dias - ult.dias));
+        if (!sig) break;
+        cadena.push(sig);
+      }
+      if (cadena.length > mejor.length) mejor = cadena;
+    }
+  }
+  if (mejor.length < 2) return null;
+  const ultima = mejor.reduce((a, b) => (b.dias > a.dias ? b : a));
+  return { pesetas: ultima.pta, pesos: Math.trunc(ultima.pta / PESETAS_POR_PESO), semanas: mejor.length, fecha: ultima.fecha };
 }
 
 function sugerirCaja(cajaActualPesos) {
@@ -664,6 +716,24 @@ async function cargarDesdeFile(file, handle) {
     ? 'Al guardar se escribe directo sobre ' + file.name + ' (el navegador te va a pedir permiso la primera vez).'
     : 'Este navegador no permite escribir el archivo en el lugar: al guardar se descarga ' + file.name + ' y lo copiás vos a la carpeta TACTICS.';
   $('nota-guardado').classList.add('visible');
+
+  // Intento de auto-detección: si funciona, mostramos la caja sin pedir nada.
+  const detectada = detectarCajaActual(estado.buffer);
+  if (detectada) {
+    try {
+      const caja = localizarCaja(estado.buffer, detectada.pesos);
+      const f = detectada.fecha;
+      $('aviso-autodetec').innerHTML = '✓ Caja detectada automáticamente' +
+        (detectada.semanas ? ' (libro de balances, ' + detectada.semanas + ' semanas · última al ' + f.dia + '-' + f.mes + '-' + f.anio + ')' : '') + '.';
+      $('aviso-autodetec').style.display = '';
+      $('bloque-manual').style.display = 'none';
+      mostrarCajaLocalizada(caja);
+      return;
+    } catch (_) { /* si la localización falla, caemos al modo manual */ }
+  }
+  // Fallback manual
+  $('aviso-autodetec').style.display = 'none';
+  $('bloque-manual').style.display = '';
   $('input-pesos').focus();
 }
 
@@ -855,6 +925,21 @@ function volcadoHex(offset) {
   return html;
 }
 
+// Pinta el resultado de una caja ya localizada y abre la sección de edición.
+function mostrarCajaLocalizada(caja) {
+  estado.caja = caja;
+  $('caja-pesos').textContent = fmt.format(caja.pesos);
+  $('caja-pesetas').textContent = '= ' + fmtDec.format(caja.pesetas) + ' pesetas internas (double LE)';
+  $('chips-copias').innerHTML = caja.offsets
+    .map((o) => '<span class="chip">copia en <b>0x' + o.toString(16).toUpperCase() + '</b></span>')
+    .join('') + '<span class="chip">' + caja.offsets.length + (caja.offsets.length === 3 ? ' copias ✓' : ' copias ⚠ (se esperaban 3)') + '</span>';
+  $('volcado-hex').innerHTML = caja.offsets.map(volcadoHex).join('\n');
+  $('resultado-caja').classList.add('visible');
+  $('seccion-editar').style.display = '';
+  pintarSugerencias();
+  $('btn-guardar').disabled = !estado.sucio;
+}
+
 $('btn-localizar').addEventListener('click', () => {
   ocultar('error-localizar');
   const texto = $('input-pesos').value.replace(/[.\s]/g, '');
@@ -862,17 +947,7 @@ $('btn-localizar').addEventListener('click', () => {
   try {
     if (!estado.buffer) throw new Error('Primero abrí una partida.');
     const caja = localizarCaja(estado.buffer, pesosMostrados);
-    estado.caja = caja;
-    $('caja-pesos').textContent = fmt.format(caja.pesos);
-    $('caja-pesetas').textContent = '= ' + fmtDec.format(caja.pesetas) + ' pesetas internas (double LE)';
-    $('chips-copias').innerHTML = caja.offsets
-      .map((o) => '<span class="chip">copia en <b>0x' + o.toString(16).toUpperCase() + '</b></span>')
-      .join('') + '<span class="chip">' + caja.offsets.length + (caja.offsets.length === 3 ? ' copias ✓' : ' copias ⚠ (se esperaban 3)') + '</span>';
-    $('volcado-hex').innerHTML = caja.offsets.map(volcadoHex).join('\n');
-    $('resultado-caja').classList.add('visible');
-    $('seccion-editar').style.display = '';
-    pintarSugerencias();
-    $('btn-guardar').disabled = !estado.sucio;
+    mostrarCajaLocalizada(caja);
     toast('Caja localizada: ' + caja.offsets.length + ' copias');
   } catch (e) {
     estado.caja = null;

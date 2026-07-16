@@ -12,6 +12,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { writeFloat64LE, readFloat64LE } from '../src/core/buffer';
 import {
+  detectarCajaActual,
   escribirCaja,
   localizarCaja,
   PESETAS_POR_PESO,
@@ -19,6 +20,7 @@ import {
   TECHO_PESETAS,
   TECHO_PESOS,
 } from '../src/core/caja';
+import { writeFecha } from '../src/core/buffer';
 import { sugerirCaja } from '../src/advisor/suggestions';
 
 // Valor real observado en el fixture de semana 3 (615.886 $ mostrados)
@@ -131,6 +133,50 @@ describe('sugerirCaja (advisor)', () => {
   });
 });
 
+describe('detectarCajaActual (buffers sintéticos)', () => {
+  /** Planta un libro de balances: entradas [fecha][caja] con stride fijo. */
+  function bufferConLibro(entradas: { fecha: { dia: number; mes: number; anio: number }; pesetas: number }[], stride = 300): Uint8Array {
+    const buf = new Uint8Array(4096);
+    let off = 100;
+    for (const e of entradas) {
+      writeFecha(buf, off, e.fecha);
+      writeFloat64LE(buf, off + 4, e.pesetas);
+      off += stride;
+    }
+    return buf;
+  }
+
+  it('detecta la caja de la última semana en un libro de 3 entradas', () => {
+    const buf = bufferConLibro([
+      { fecha: { dia: 3, mes: 8, anio: 1998 }, pesetas: 90_000_000 },
+      { fecha: { dia: 10, mes: 8, anio: 1998 }, pesetas: 95_000_000 },
+      { fecha: { dia: 17, mes: 8, anio: 1998 }, pesetas: 113_272_386 },
+    ]);
+    const det = detectarCajaActual(buf);
+    expect(det).not.toBeNull();
+    expect(det!.pesetas).toBe(113_272_386);
+    expect(det!.semanas).toBe(3);
+    expect(det!.fecha).toEqual({ dia: 17, mes: 8, anio: 1998 });
+  });
+
+  it('ignora un par [fecha][caja] suelto que no forma cadena semanal (ruido)', () => {
+    const buf = bufferConLibro([
+      { fecha: { dia: 3, mes: 8, anio: 1998 }, pesetas: 90_000_000 },
+      { fecha: { dia: 10, mes: 8, anio: 1998 }, pesetas: 95_000_000 },
+    ]);
+    // Ruido aislado con fecha "más reciente" pero sin vecinos semanales
+    writeFecha(buf, 2000, { dia: 24, mes: 4, anio: 1999 });
+    writeFloat64LE(buf, 2004, 3_000_000);
+    const det = detectarCajaActual(buf);
+    expect(det!.pesetas).toBe(95_000_000); // gana la cadena, no el ruido reciente
+  });
+
+  it('devuelve null si no hay al menos 2 semanas encadenadas', () => {
+    const buf = bufferConLibro([{ fecha: { dia: 3, mes: 8, anio: 1998 }, pesetas: 90_000_000 }]);
+    expect(detectarCajaActual(buf)).toBeNull();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Integración contra fixtures REALES (se saltean si no están)
 // ---------------------------------------------------------------------------
@@ -153,5 +199,21 @@ describe.skipIf(!existsSync(FIXTURE_SEMANA4))('integración: fixture real semana
     const caja = localizarCaja(buf, 755_149);
     expect(caja.offsets).toHaveLength(3);
     expect(caja.pesetas).toBeCloseTo(113_272_386.211, 2);
+  });
+});
+
+describe.skipIf(!existsSync(FIXTURE_SEMANA3))('integración: auto-detección sin ingresar el valor', () => {
+  it('detecta 615.886 $ en el fixture de semana 3', async () => {
+    const buf = new Uint8Array(await readFile(FIXTURE_SEMANA3));
+    const det = detectarCajaActual(buf);
+    expect(det).not.toBeNull();
+    expect(det!.pesos).toBe(615_886);
+  });
+
+  it('detecta 755.149 $ en el fixture de semana 4', async () => {
+    const buf = new Uint8Array(await readFile(FIXTURE_SEMANA4));
+    const det = detectarCajaActual(buf);
+    expect(det).not.toBeNull();
+    expect(det!.pesos).toBe(755_149);
   });
 });
