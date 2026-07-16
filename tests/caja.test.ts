@@ -92,9 +92,16 @@ describe('escribirCaja', () => {
     expect(localizarCaja(buf, 7_000_000).offsets).toEqual([100, 900, 1700]);
   });
 
-  it('rechaza valores sobre el techo de overflow', () => {
+  it('rechaza valores sobre el tope práctico', () => {
     const buf = bufferSintetico();
-    expect(() => escribirCaja(buf, [100], TECHO_PESETAS + 1)).toThrow(/techo/);
+    expect(() => escribirCaja(buf, [100], TECHO_PESETAS + 1)).toThrow(/tope/);
+  });
+
+  it('acepta un valor de miles de millones de pesetas (la caja es double, no int32)', () => {
+    const buf = bufferSintetico();
+    const diezMilMillones = 10_000_000_000; // lo que tiene un club rico del juego
+    escribirCaja(buf, [100], diezMilMillones);
+    expect(readFloat64LE(buf, 100)).toBe(diezMilMillones);
   });
 
   it('rechaza valores no positivos y lista de offsets vacía', () => {
@@ -120,7 +127,7 @@ describe('sugerirCaja (advisor)', () => {
 
   it('la opción discreta escala con la caja actual pero tiene piso y techo', () => {
     expect(sugerirCaja(10_000)[0]!.pesos).toBe(1_000_000); // piso
-    expect(sugerirCaja(10_000_000)[0]!.pesos).toBe(2_000_000); // techo de la discreta
+    expect(sugerirCaja(10_000_000)[0]!.pesos).toBe(5_000_000); // techo de la discreta
   });
 });
 

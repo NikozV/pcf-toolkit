@@ -15,14 +15,35 @@ import { readFloat64LE, writeFloat64LE } from './buffer';
 export const PESETAS_POR_PESO = 150;
 
 /**
- * Techo seguro en pesetas: máximo de int32 con signo. El storage es double,
- * pero la lógica del juego castea a entero de 32 bits (overflow reportado por
- * la comunidad pasando ~2.147 millones de pta).
+ * Techo práctico de la caja, en PESOS mostrados: 999.999.999 (9 dígitos).
+ *
+ * Ojo: la caja se guarda como DOUBLE, así que el storage no tiene un techo
+ * real acá cerca. El límite de int32 de ~2.147 millones que decían los foros
+ * es de los contadores de INGRESOS por partido/semana (esos sí son int32 y
+ * overflowean), NO de la caja. Evidencia (recon 2026-07-16 sobre fixture real):
+ * el juego mismo tiene clubes con cajas de 4.000M / 7.000M / 10.000M de PESETAS
+ * (presupuestos redondos, decenas de copias) y los más ricos llegan a ~100.000M
+ * de pesetas (≈ 666M pesos mostrados). O sea, el juego maneja cajas de miles de
+ * millones de pesetas sin problema.
+ *
+ * Elegimos 999.999.999 pesos como tope: es la misma cantidad de dígitos que ya
+ * muestran los clubes ricos (la pantalla de finanzas los muestra bien), y deja
+ * plata de sobra para cualquier hobby. Confirmación definitiva pendiente:
+ * editar a un valor alto, cargar el juego y verificar que la pantalla lo muestra
+ * bien y no se corrompe nada.
  */
-export const TECHO_PESETAS = 2_147_483_647;
+export const TECHO_PESOS = 999_999_999;
 
-/** El techo expresado en pesos mostrados por el juego. */
-export const TECHO_PESOS = Math.trunc(TECHO_PESETAS / PESETAS_POR_PESO); // 14.316.557
+/** El techo expresado en pesetas internas (double). */
+export const TECHO_PESETAS = TECHO_PESOS * PESETAS_POR_PESO; // 149.999.999.850
+
+/**
+ * Zona "verde" confirmada: el juego genera de fábrica cajas redondas de hasta
+ * 10.000M de pesetas (≈ 66,6M pesos). Por debajo de esto estamos pisando
+ * terreno que el propio juego usa; por encima, seguimos en el mismo orden de
+ * magnitud que sus clubes más ricos, pero es zona no generada de fábrica.
+ */
+export const ZONA_VERDE_PESOS = Math.trunc(10_000_000_000 / PESETAS_POR_PESO); // 66.666.666
 
 export function pesetasAPesos(pesetas: number): number {
   return Math.trunc(pesetas / PESETAS_POR_PESO);
@@ -111,8 +132,8 @@ export function escribirCaja(buf: Uint8Array, offsets: number[], nuevaPesetas: n
   }
   if (nuevaPesetas > TECHO_PESETAS) {
     throw new RangeError(
-      `${nuevaPesetas.toLocaleString('es-AR')} pta supera el techo seguro de ${TECHO_PESETAS.toLocaleString('es-AR')} pta ` +
-        `(${TECHO_PESOS.toLocaleString('es-AR')} $): riesgo de overflow del contador del juego.`,
+      `${nuevaPesetas.toLocaleString('es-AR')} pta supera el tope práctico de ${TECHO_PESETAS.toLocaleString('es-AR')} pta ` +
+        `(${TECHO_PESOS.toLocaleString('es-AR')} $): más que eso ya no entra prolijo en la pantalla de finanzas.`,
     );
   }
   if (offsets.length === 0) {

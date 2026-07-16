@@ -113,6 +113,22 @@
   .zona-drop strong { color: var(--texto); }
   .zona-drop .pista { font-size: 12.5px; color: var(--texto-3); margin-top: 6px; }
 
+  .separador-o { margin-top: 16px; text-align: center; }
+  .pista-chica { font-size: 12px; color: var(--texto-3); margin-top: 6px; }
+
+  .lista-partidas { display: grid; gap: 8px; margin-bottom: 6px; max-height: 320px; overflow-y: auto; }
+  .item-partida {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    background: var(--fondo); border: 1px solid var(--borde); border-radius: 9px;
+    padding: 10px 14px; cursor: pointer; color: var(--texto); font: inherit;
+    transition: border-color .15s, background .15s;
+  }
+  .item-partida:hover { border-color: var(--verde); background: rgba(53, 208, 127, .05); }
+  .icono-item { font-size: 20px; }
+  .datos-item { display: flex; flex-direction: column; gap: 2px; }
+  .nombre-item { font-family: var(--mono); font-size: 14px; }
+  .meta-item { font-size: 11.5px; color: var(--texto-3); }
+
   .ficha-archivo { display: none; align-items: center; gap: 14px; }
   .ficha-archivo.visible { display: flex; }
   .ficha-archivo .icono-doc {
@@ -288,12 +304,51 @@
     <section class="tarjeta">
       <h2><span class="paso">1</span> Partida</h2>
 
-      <div class="zona-drop" id="zona-drop" role="button" tabindex="0"
-           aria-label="Abrir archivo de partida">
-        <span class="icono">📂</span>
-        <strong>Abrí tu partida</strong> — clic acá o arrastrá el archivo
-        <div class="pista">managXXX.XXX de la carpeta TACTICS del juego · se recomienda cerrar el juego antes de editar</div>
+      <!-- Sin carpeta recordada todavía: abrir un archivo suelto -->
+      <div id="vista-sin-carpeta">
+        <div class="zona-drop" id="zona-drop" data-accion="abrir" role="button" tabindex="0"
+             aria-label="Abrir archivo de partida">
+          <span class="icono">📂</span>
+          <strong>Abrí tu partida</strong> — clic acá o arrastrá el archivo
+          <div class="pista">managXXX.XXX de la carpeta TACTICS del juego · se recomienda cerrar el juego antes de editar</div>
+        </div>
+        <div class="separador-o" id="boton-recordar-carpeta-cont">
+          <button class="boton chico" id="btn-recordar-carpeta">📁 Recordar mi carpeta de partidas…</button>
+          <div class="pista-chica">La próxima vez esta página va a listar tus partidas sola (Chrome/Edge).</div>
+        </div>
       </div>
+
+      <!-- Hay carpeta recordada pero el navegador todavía no confirmó el permiso -->
+      <div id="vista-reactivar" style="display:none">
+        <div class="zona-drop" id="zona-reactivar" role="button" tabindex="0">
+          <span class="icono">🔒</span>
+          <strong>Carpeta recordada: <span id="nombre-carpeta-reactivar"></span></strong>
+          <div class="pista">El navegador necesita que confirmes el acceso de nuevo — clic acá</div>
+        </div>
+      </div>
+
+      <!-- Carpeta recordada y con permiso: lista de partidas -->
+      <div id="vista-con-carpeta" style="display:none">
+        <div class="fila" style="margin-bottom:14px; align-items:center">
+          <div class="crece" style="font-size:13px; color:var(--texto-2)">
+            📁 <span id="nombre-carpeta-actual" style="font-family:var(--mono)"></span>
+          </div>
+          <button class="boton chico" id="btn-refrescar-lista" title="Releer la carpeta">↻</button>
+          <button class="boton chico" id="btn-cambiar-carpeta">Cambiar…</button>
+        </div>
+        <div class="lista-partidas" id="lista-partidas"></div>
+        <div class="fila" style="margin-top:8px">
+          <button class="boton chico peligro" id="btn-olvidar-carpeta">Olvidar esta carpeta</button>
+        </div>
+        <details style="margin-top:16px">
+          <summary style="cursor:pointer; font-size:12.5px; color:var(--texto-3)">Abrir otro archivo (fuera de esta carpeta)</summary>
+          <div class="zona-drop" id="zona-drop-secundaria" data-accion="abrir" role="button" tabindex="0" style="margin-top:10px">
+            <span class="icono">📂</span>
+            <strong>Abrí un archivo</strong> — clic acá o arrastrá
+          </div>
+        </details>
+      </div>
+
       <input type="file" id="input-archivo" hidden>
 
       <div class="ficha-archivo" id="ficha-archivo">
@@ -315,7 +370,8 @@
       <div class="fila">
         <div class="crece">
           <label for="input-pesos">Caja actual <b>exacta</b> según la pantalla de finanzas del juego (en $, sin puntos)</label>
-          <input type="text" id="input-pesos" inputmode="numeric" placeholder="755149" autocomplete="off">
+          <input type="text" id="input-pesos" inputmode="numeric" placeholder="755149"
+                 autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-caja-actual" readonly>
         </div>
         <button class="boton primario" id="btn-localizar">🔍 Localizar</button>
       </div>
@@ -341,7 +397,8 @@
 
       <label for="input-nueva">Valor a medida (en $)</label>
       <div class="fila">
-        <div class="crece"><input type="text" id="input-nueva" inputmode="numeric" placeholder="7000000" autocomplete="off"></div>
+        <div class="crece"><input type="text" id="input-nueva" inputmode="numeric" placeholder="50000000"
+               autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-caja-nueva" readonly></div>
         <button class="boton primario" id="btn-aplicar" disabled>✏️ Aplicar</button>
       </div>
 
@@ -349,7 +406,7 @@
         <div class="barra"><div class="relleno" id="medidor-relleno"></div></div>
         <div class="leyenda">
           <span>0 $</span>
-          <span id="medidor-texto">techo seguro: 14.316.557 $</span>
+          <span id="medidor-texto">zona probada: hasta 66.666.666 $</span>
         </div>
       </div>
 
@@ -407,7 +464,7 @@
       <h2>Reglas de seguridad</h2>
       <div class="desc-item" style="font-size:12.5px; color:var(--texto-2); line-height:1.7">
         · Editá siempre <b>con el juego cerrado</b>.<br>
-        · El techo de <b>14.316.557 $</b> (2.147M pta) evita el overflow del contador interno del juego — el editor no deja pasarlo.<br>
+        · La caja es un <b>double</b>: el juego mismo maneja clubes con miles de millones de pesetas. Hasta <b>66.666.666 $</b> es zona que el juego genera de fábrica; el tope del editor (<b>999.999.999 $</b>) es por prolijidad de pantalla, no por overflow.<br>
         · La edición cambia <b>solo los bytes de la caja</b>: el resto del archivo queda byte a byte idéntico.<br>
         · Antes de guardar podés bajarte un <b>backup del original</b>; «Restaurar» descarta los cambios en memoria.
       </div>
@@ -429,8 +486,13 @@
    y tiene los tests).
    ============================================================================ */
 const PESETAS_POR_PESO = 150;
-const TECHO_PESETAS = 2147483647;
-const TECHO_PESOS = Math.trunc(TECHO_PESETAS / PESETAS_POR_PESO); // 14.316.557
+// La caja es un DOUBLE (no int32): el juego mismo tiene clubes con miles de
+// millones de pesetas. El límite de ~2.147M era de los contadores de ingresos,
+// no de la caja. Tope práctico = 999.999.999 pesos (misma cantidad de dígitos
+// que ya muestran los clubes ricos). Ver src/core/caja.ts para el detalle.
+const TECHO_PESOS = 999999999;
+const TECHO_PESETAS = TECHO_PESOS * PESETAS_POR_PESO;
+const ZONA_VERDE_PESOS = Math.trunc(10000000000 / PESETAS_POR_PESO); // 66.666.666
 
 const fmt = new Intl.NumberFormat('es-AR');
 const fmtDec = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 3 });
@@ -479,14 +541,14 @@ function escribirCaja(buf, offsets, nuevaPesetas) {
 
 function sugerirCaja(cajaActualPesos) {
   const redondear = (p) => Math.floor(p / 50000) * 50000;
-  const discreta = Math.min(Math.max(redondear(cajaActualPesos * 5), 1000000), 2000000);
+  const discreta = Math.min(Math.max(redondear(cajaActualPesos * 5), 1000000), 5000000);
   return [
     { nombre: 'discreta', pesos: discreta,
       expl: 'Como una buena venta de jugador. No rompe la escala de la divisional: el desafío deportivo se mantiene.' },
-    { nombre: 'holgada', pesos: 7000000,
-      expl: 'Plata de sobra para fichar y ampliar el estadio durante temporadas, con la mitad del techo libre.' },
-    { nombre: 'al límite', pesos: redondear(TECHO_PESOS * 0.95),
-      expl: 'Máximo prudente: 95% del techo de overflow. El 5% restante es colchón para ingresos semanales.' },
+    { nombre: 'holgada', pesos: 50000000,
+      expl: 'Plata para fichar a cualquiera y ampliar el estadio durante temporadas. Nada raro para el juego.' },
+    { nombre: 'fortuna', pesos: ZONA_VERDE_PESOS,
+      expl: 'Al nivel del club más rico que el juego genera de fábrica (~10.000M de pesetas). Terreno probado.' },
   ];
 }
 
@@ -503,6 +565,62 @@ const estado = {
   sucio: false,       // hay cambios sin guardar
 };
 const soportaFS = 'showOpenFilePicker' in window;
+const soportaCarpetas = 'showDirectoryPicker' in window;
+
+// Los campos numéricos arrancan readonly para que el navegador NO los
+// autocomplete solo; al primer foco/clic se habilitan para tipear.
+for (const id of ['input-pesos', 'input-nueva']) {
+  const quitar = () => document.getElementById(id).removeAttribute('readonly');
+  const el = document.getElementById(id);
+  el.addEventListener('focus', quitar);
+  el.addEventListener('pointerdown', quitar);
+}
+let carpetaHandle = null; // FileSystemDirectoryHandle recordado (IndexedDB)
+
+/* ============================================================================
+   Recordar la carpeta de partidas en IndexedDB (sin servidor, sin .env: el
+   permiso vive en el navegador). Guardamos el FileSystemDirectoryHandle tal
+   cual — Chrome/Edge lo soportan como valor estructurado-clonable.
+   ============================================================================ */
+const DB_NOMBRE = 'pcf-toolkit';
+const DB_TABLA = 'handles';
+const CLAVE_CARPETA = 'carpetaPartidas';
+
+function abrirDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NOMBRE, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(DB_TABLA);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function guardarHandleCarpeta(handle) {
+  const db = await abrirDB();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_TABLA, 'readwrite');
+    tx.objectStore(DB_TABLA).put(handle, CLAVE_CARPETA);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function leerHandleCarpeta() {
+  const db = await abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_TABLA, 'readonly');
+    const req = tx.objectStore(DB_TABLA).get(CLAVE_CARPETA);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function olvidarCarpetaGuardada() {
+  const db = await abrirDB();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_TABLA, 'readwrite');
+    tx.objectStore(DB_TABLA).delete(CLAVE_CARPETA);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
 
 function toast(mensaje) {
   const t = $('toast');
@@ -529,7 +647,9 @@ async function cargarDesdeFile(file, handle) {
   estado.caja = null;
   estado.sucio = false;
 
-  $('zona-drop').style.display = 'none';
+  $('vista-sin-carpeta').style.display = 'none';
+  $('vista-reactivar').style.display = 'none';
+  $('vista-con-carpeta').style.display = 'none';
   $('ficha-archivo').classList.add('visible');
   $('nombre-archivo').textContent = file.name;
   $('meta-archivo').textContent = fmt.format(bytes.length) + ' bytes · ' +
@@ -562,8 +682,10 @@ async function abrirConPicker() {
   }
 }
 
-$('zona-drop').addEventListener('click', abrirConPicker);
-$('zona-drop').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') abrirConPicker(); });
+document.querySelectorAll('.zona-drop[data-accion="abrir"]').forEach((zona) => {
+  zona.addEventListener('click', abrirConPicker);
+  zona.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') abrirConPicker(); });
+});
 $('btn-otro').addEventListener('click', () => {
   if (estado.sucio && !confirm('Hay cambios sin guardar. ¿Abrir otro archivo igual?')) return;
   location.reload();
@@ -573,11 +695,16 @@ $('input-archivo').addEventListener('change', (e) => {
   if (file) cargarDesdeFile(file, null);
 });
 
-document.addEventListener('dragover', (e) => { e.preventDefault(); $('zona-drop').classList.add('encima'); });
-document.addEventListener('dragleave', () => $('zona-drop').classList.remove('encima'));
+document.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  document.querySelectorAll('.zona-drop').forEach((z) => z.classList.add('encima'));
+});
+document.addEventListener('dragleave', () => {
+  document.querySelectorAll('.zona-drop').forEach((z) => z.classList.remove('encima'));
+});
 document.addEventListener('drop', async (e) => {
   e.preventDefault();
-  $('zona-drop').classList.remove('encima');
+  document.querySelectorAll('.zona-drop').forEach((z) => z.classList.remove('encima'));
   const item = e.dataTransfer.items && e.dataTransfer.items[0];
   if (!item) return;
   let handle = null;
@@ -588,6 +715,120 @@ document.addEventListener('drop', async (e) => {
   const file = handle ? await handle.getFile() : item.getAsFile();
   if (file) cargarDesdeFile(file, handle);
 });
+
+/* ============================================================================
+   Carpeta recordada: listar partidas y elegir una con un clic
+   ============================================================================ */
+if (!soportaCarpetas) $('boton-recordar-carpeta-cont').style.display = 'none';
+
+/** Decide cuál de las 3 vistas de la sección 1 mostrar y la puebla. */
+async function actualizarVistaPartida() {
+  $('vista-sin-carpeta').style.display = 'none';
+  $('vista-reactivar').style.display = 'none';
+  $('vista-con-carpeta').style.display = 'none';
+
+  if (!soportaCarpetas) { $('vista-sin-carpeta').style.display = ''; return; }
+
+  let handle = null;
+  try { handle = await leerHandleCarpeta(); } catch { handle = null; }
+  if (!handle) { $('vista-sin-carpeta').style.display = ''; return; }
+
+  carpetaHandle = handle;
+  let permiso = 'denied';
+  try { permiso = await handle.queryPermission({ mode: 'readwrite' }); } catch { permiso = 'denied'; }
+
+  if (permiso !== 'granted') {
+    $('vista-reactivar').style.display = '';
+    $('nombre-carpeta-reactivar').textContent = handle.name;
+    return;
+  }
+  $('vista-con-carpeta').style.display = '';
+  $('nombre-carpeta-actual').textContent = handle.name;
+  await refrescarListaPartidas();
+}
+
+async function refrescarListaPartidas() {
+  const cont = $('lista-partidas');
+  cont.innerHTML = '<div class="pista-chica">Leyendo carpeta…</div>';
+  const items = [];
+  try {
+    for await (const [nombre, hijo] of carpetaHandle.entries()) {
+      if (hijo.kind !== 'file') continue;
+      const file = await hijo.getFile();
+      items.push({ nombre, handle: hijo, size: file.size, modificado: file.lastModified });
+    }
+  } catch (e) {
+    cont.innerHTML = '<div class="pista-chica">No pude leer la carpeta: ' + e.message + '</div>';
+    return;
+  }
+  items.sort((a, b) => b.modificado - a.modificado);
+  if (items.length === 0) {
+    cont.innerHTML = '<div class="pista-chica">La carpeta está vacía.</div>';
+    return;
+  }
+  cont.innerHTML = '';
+  for (const item of items) {
+    const esSave = /^manag/i.test(item.nombre);
+    const fila = document.createElement('button');
+    fila.className = 'item-partida';
+    fila.innerHTML =
+      '<span class="icono-item">' + (esSave ? '🗂️' : '📄') + '</span>' +
+      '<span class="datos-item">' +
+        '<span class="nombre-item">' + item.nombre + '</span>' +
+        '<span class="meta-item">' + fmt.format(item.size) + ' bytes · ' + new Date(item.modificado).toLocaleString('es-AR') + '</span>' +
+      '</span>';
+    fila.addEventListener('click', () => elegirPartidaDeLista(item.handle));
+    cont.appendChild(fila);
+  }
+}
+
+async function elegirPartidaDeLista(fileHandle) {
+  try {
+    if ((await fileHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+      await fileHandle.requestPermission({ mode: 'readwrite' }); // best-effort: si lo niega, igual la abrimos
+    }
+    await cargarDesdeFile(await fileHandle.getFile(), fileHandle);
+  } catch (e) {
+    toast('No pude abrir ese archivo: ' + e.message);
+  }
+}
+
+$('btn-recordar-carpeta').addEventListener('click', async () => {
+  try {
+    const handle = await window.showDirectoryPicker({ id: 'pcf-tactics', mode: 'readwrite' });
+    await guardarHandleCarpeta(handle);
+    await actualizarVistaPartida();
+    toast('Carpeta recordada: ' + handle.name);
+  } catch (e) { if (e.name !== 'AbortError') toast('No pude recordar la carpeta: ' + e.message); }
+});
+
+$('btn-cambiar-carpeta').addEventListener('click', async () => {
+  try {
+    const handle = await window.showDirectoryPicker({ id: 'pcf-tactics', mode: 'readwrite' });
+    await guardarHandleCarpeta(handle);
+    await actualizarVistaPartida();
+  } catch (e) { if (e.name !== 'AbortError') toast('No pude cambiar la carpeta: ' + e.message); }
+});
+
+$('btn-refrescar-lista').addEventListener('click', refrescarListaPartidas);
+
+$('btn-olvidar-carpeta').addEventListener('click', async () => {
+  if (!confirm('¿Olvidar el acceso a esta carpeta? La próxima vez la vas a tener que elegir de nuevo.')) return;
+  await olvidarCarpetaGuardada();
+  carpetaHandle = null;
+  await actualizarVistaPartida();
+});
+
+$('zona-reactivar').addEventListener('click', async () => {
+  try {
+    const permiso = await carpetaHandle.requestPermission({ mode: 'readwrite' });
+    if (permiso === 'granted') await actualizarVistaPartida();
+    else toast('El navegador no dio permiso para esa carpeta.');
+  } catch (e) { toast('Error: ' + e.message); }
+});
+$('zona-reactivar').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') $('zona-reactivar').click(); });
+
+actualizarVistaPartida();
 
 /* ============================================================================
    Localizar caja
@@ -669,9 +910,15 @@ function pintarSugerencias() {
 }
 
 function actualizarMedidor(pesosMostrados) {
-  const pct = Math.min(100, (pesosMostrados / TECHO_PESOS) * 100);
+  // La barra se llena respecto de la "zona verde" (lo que el juego genera de
+  // fábrica). Pasada esa marca, se queda llena y el texto cambia de tono.
+  const pct = Math.min(100, (pesosMostrados / ZONA_VERDE_PESOS) * 100);
   $('medidor-relleno').style.width = pct.toFixed(2) + '%';
-  $('medidor-texto').textContent = pct.toFixed(1) + '% del techo seguro (' + fmt.format(TECHO_PESOS) + ' $)';
+  if (pesosMostrados <= ZONA_VERDE_PESOS) {
+    $('medidor-texto').textContent = 'zona probada: ' + fmt.format(pesosMostrados) + ' de ' + fmt.format(ZONA_VERDE_PESOS) + ' $';
+  } else {
+    $('medidor-texto').textContent = 'por encima de lo que genera el juego (tope: ' + fmt.format(TECHO_PESOS) + ' $)';
+  }
 }
 
 function leerNueva() {
@@ -685,12 +932,12 @@ function validarNueva() {
   if (!Number.isInteger(nueva) || nueva <= 0) { $('btn-aplicar').disabled = true; return; }
   actualizarMedidor(nueva);
   if (nueva > TECHO_PESOS) {
-    mostrar('aviso-editar', 'Supera el techo seguro de ' + fmt.format(TECHO_PESOS) + ' $ — riesgo de overflow del contador del juego. No se puede aplicar.', 'error');
+    mostrar('aviso-editar', 'Supera el tope práctico de ' + fmt.format(TECHO_PESOS) + ' $ (9 dígitos): más que eso ya no entra prolijo en la pantalla de finanzas. No se puede aplicar.', 'error');
     $('btn-aplicar').disabled = true;
     return;
   }
-  if (nueva > TECHO_PESOS * 0.95) {
-    mostrar('aviso-editar', 'Muy cerca del techo: dejá margen para los ingresos semanales o el contador puede desbordar solo.', 'info');
+  if (nueva > ZONA_VERDE_PESOS) {
+    mostrar('aviso-editar', 'Por encima de lo que el juego genera de fábrica (' + fmt.format(ZONA_VERDE_PESOS) + ' $), pero en el mismo orden que sus clubes más ricos. Se puede aplicar; con backup no hay drama.', 'info');
   }
   $('btn-aplicar').disabled = false;
 }

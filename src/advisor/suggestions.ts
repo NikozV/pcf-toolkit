@@ -5,7 +5,7 @@
  * con trade-offs explicados, respetando el techo de overflow conocido.
  */
 
-import { pesosAPesetas, TECHO_PESOS } from '../core/caja';
+import { pesosAPesetas, ZONA_VERDE_PESOS } from '../core/caja';
 
 export interface OpcionCaja {
   nombre: string;
@@ -23,12 +23,13 @@ function redondear(pesos: number): number {
 
 /**
  * Dado el estado actual de la caja (en pesos mostrados), devuelve tres
- * variantes con trade-offs, todas por debajo del techo de overflow.
+ * variantes con trade-offs. Van desde "no romper la divisional" hasta
+ * "como el club más rico del juego".
  */
 export function sugerirCaja(cajaActualPesos: number): OpcionCaja[] {
-  const discreta = Math.min(Math.max(redondear(cajaActualPesos * 5), 1_000_000), 2_000_000);
-  const holgada = 7_000_000;
-  const limite = redondear(TECHO_PESOS * 0.95); // 5% de colchón ante ingresos semanales
+  const discreta = Math.min(Math.max(redondear(cajaActualPesos * 5), 1_000_000), 5_000_000);
+  const holgada = 50_000_000; // fichar a cualquiera y ampliar el estadio, sin ser absurdo
+  const fortuna = ZONA_VERDE_PESOS; // 66,6M: el máximo que el juego genera de fábrica (redondo)
 
   const opciones: OpcionCaja[] = [
     {
@@ -43,13 +44,13 @@ export function sugerirCaja(cajaActualPesos: number): OpcionCaja[] {
       pesos: holgada,
       pesetas: pesosAPesetas(holgada),
       explicacion:
-        'Plata de sobra para fichar y ampliar el estadio durante temporadas, con la mitad del techo libre para acumular ingresos sin riesgo.',
+        'Plata para fichar a cualquiera y ampliar el estadio durante temporadas. Muy por encima de lo que necesita un club de la B, pero nada raro para el juego.',
     },
     {
-      nombre: 'al límite',
-      pesos: limite,
-      pesetas: pesosAPesetas(limite),
-      explicacion: `Máximo prudente: 95% del techo de overflow (${TECHO_PESOS.toLocaleString('es-AR')} $). El 5% restante es colchón para ingresos semanales; no acumular mucho más.`,
+      nombre: 'fortuna',
+      pesos: fortuna,
+      pesetas: pesosAPesetas(fortuna),
+      explicacion: `Al nivel del club más rico que el juego genera de fábrica (${fortuna.toLocaleString('es-AR')} $ ≈ 10.000M de pesetas). Terreno probado: hay clubes IA con esta plata funcionando sin problemas.`,
     },
   ];
   return opciones;
