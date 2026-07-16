@@ -52,7 +52,19 @@
       },
       "atributos_jugador_crudos": {
         "estado": "hipotesis",
-        "nota": "Junto a cada nombre decodificado hay corridas de 8-13 bytes con valores ~40..95 (ej. 87,82,80,89,81,81,77,83 junto a Amunike) que parecen ser los atributos SIN ofuscar (binario crudo). Falta confirmar contra los valores visibles en el juego. Implicación para la búsqueda de plata: los campos numéricos estarían crudos, así que la plata se busca como int32 LE directo sobre el archivo sin decodificar."
+        "nota": "Junto a cada nombre decodificado hay corridas de 8-13 bytes con valores ~40..95 (ej. 87,82,80,89,81,81,77,83 junto a Amunike) que parecen ser los atributos SIN ofuscar (binario crudo). Falta confirmar contra los valores visibles en el juego."
+      },
+      "formato_strings": {
+        "estado": "confirmado",
+        "nota": "Confirmado 2026-07-16 contra fixtures/manag003-inicial.000: strings con prefijo de largo uint16 LE + caracteres XOR 0x61, sin terminador. Verificado exacto en 'San Martín (Mza)': prefijo 10 00 (=16) en 0x21207B y los 16 chars siguientes decodifican el nombre, í = 0xED^0x61 = 0x8C. Excepción: nombres de DT/mánager en ASCII plano ('Van Gaal' en 0x183, 'Ragusa' en 0x21219E), aparentemente también con prefijo de largo."
+      },
+      "plata_club": {
+        "estado": "hipotesis",
+        "nota": "Evidencia 2026-07-16 (fixtures/manag003-inicial.000, partida recién creada manejando San Martín de Mendoza): cada registro de club tiene DOS doubles IEEE 754 LE consecutivos (8 bytes de separación) con el presupuesto. Clubes IA: valores redondos e iguales — San Martín (Tuc) 103.000.000 en 0x1EF270/0x1EF278, San Martín (SJ) 109.000.000 en 0x1F9ED3/0x1F9EDB, Sporting Cristal 2.000.000.000 en 0x1AD1B3/0x1AD1BB. Club del usuario, San Martín (Mza): 96.172.312,79 en 0x2121E4 y 92.382.902,45 en 0x212340 (no redondos: la economía inicial ya corrió). PENDIENTE: confirmar contra el valor exacto de Tesorería en pantalla + diff antes/después de una operación de monto conocido. OJO: la plata sería double, NO int32 — el techo de 2.147M reportado en foros sería del casteo a int32 en la lógica del juego, no del storage."
+      },
+      "estadio_candidatos": {
+        "estado": "hipotesis",
+        "nota": "En el registro de San Martín (Mza): int32 20.000 en 0x2120C5 (aparece de nuevo en 0x2121A7 tras el nombre del DT) y 2.200 en 0x2120CD — candidatos a aforo del estadio (¿de pie/sentados?). Falta contrastar con la pantalla de estadio del juego."
       }
     }
   }
