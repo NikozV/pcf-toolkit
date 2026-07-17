@@ -41,7 +41,12 @@ El hex editor manual ([web/pcf-editor.html](web/pcf-editor.html)) sigue disponib
 ## Estado
 
 - **Fase 1 lista**: capa de bajo nivel — lectura/escritura de bytes, carga segura de archivos, `pcf diff`.
-- **Caja del club (PCF6 Argentina) confirmada y editable**: se guarda como double LE en pesetas (el juego muestra pesos = pesetas/150) en 3 copias que se localizan por valor. `pcf caja` la encuentra, sugiere valores seguros bajo el techo de overflow (14.316.557 $) y edita sobre copia.
+- **Caja del club (PCF6 Argentina) confirmada y editable**: se guarda como double LE en pesetas (el juego muestra pesos = pesetas/150) en 3 copias que se localizan por valor. Se **auto-detecta** por el libro de balances semanal (no hace falta ingresar el valor). `pcf caja` la encuentra, sugiere valores seguros y guarda directo sobre el archivo con backup automático.
+- **Interfaz gráfica** ([web/pcf-toolkit.html](web/pcf-toolkit.html)): editor visual standalone.
 
 Próximos pasos: bloque de estadio (candidatos ya anotados en `offsets.json`) y atributos de jugadores.
+
+---
+
+<sub>elaltillo · 1984–2026</sub>
 
