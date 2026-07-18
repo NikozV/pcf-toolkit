@@ -443,7 +443,7 @@
           <!-- Fallback manual: solo si no se pudo auto-detectar -->
           <div id="bloque-manual" style="display:none">
             <div class="aviso info visible" style="margin-bottom:12px">
-              No pude leer la caja sola (partida muy al principio o formato distinto). Ponela como la muestra la pantalla de finanzas del juego.
+              No pude leer la caja sola: la detección automática usa el libro de balances semanal, que necesita <b>al menos 2 semanas jugadas</b>. En una partida recién creada, ingresá la caja tal como la muestra la pantalla de finanzas — con eso se destraban también el plantel y el estadio. (O jugá un par de semanas, guardá, y se detecta todo solo.)
             </div>
             <div class="fila">
               <div class="crece">
@@ -501,7 +501,7 @@
         <div id="plantel-cargando" class="pista-chica" style="display:none">Detectando tu plantel…</div>
         <div class="grid-plantel" id="grid-plantel"></div>
         <div id="plantel-vacio" class="aviso info" style="display:none">
-          No pude detectar el plantel automáticamente (partida muy al principio). Buscá un jugador por nombre abajo.
+          No pude detectar el plantel: se ancla a la caja. Si la partida es recién creada, ingresá la caja a mano en «Tesorería» y esta lista se llena sola. También podés buscar cualquier jugador por nombre abajo.
         </div>
 
         <details style="margin-top:16px">
@@ -807,12 +807,12 @@ function parsearRegistroEn(buf, posPrefijo) {
   if (!bloqueAttrValido(buf, off)) return null;
   return { offsetNombre: posPrefijo + 2, nombreCorto: corto.texto, nombreLargo: largo.texto, offsetAtributos: off, atributos: leerAtributos(buf, off) };
 }
-function detectarPlantel(buf) {
-  const caja = detectarCajaActual(buf);
-  if (!caja) return [];
+function detectarPlantel(buf, cajaPesetas) {
+  const pesetas = cajaPesetas ?? (detectarCajaActual(buf) || {}).pesetas;
+  if (pesetas === undefined) return [];
   const vista = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   let ultima = -1;
-  for (let i = 0; i <= buf.length - 8; i++) if (vista.getFloat64(i, true) === caja.pesetas) ultima = i;
+  for (let i = 0; i <= buf.length - 8; i++) if (vista.getFloat64(i, true) === pesetas) ultima = i;
   if (ultima === -1) return [];
   let inicio = -1;
   for (let p = ultima; p < ultima + 512 && p < buf.length; p++) if (parsearRegistroEn(buf, p)) { inicio = p; break; }
@@ -850,11 +850,12 @@ function clubEn(buf, pos) {
   if (cap < CAP_MIN || cap > 200000) return null;
   return { nombreClub: corto.texto, nombreEstadio: estadio.texto, capacidad: cap, offsetCapacidad: off };
 }
-function detectarEstadio(buf) {
-  const caja = detectarCajaActual(buf); if (!caja) return null;
+function detectarEstadio(buf, cajaPesetas) {
+  const pesetas = cajaPesetas ?? (detectarCajaActual(buf) || {}).pesetas;
+  if (pesetas === undefined) return null;
   const vista = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   let primera = -1;
-  for (let i = 0; i <= buf.length - 8; i++) if (vista.getFloat64(i, true) === caja.pesetas) { primera = i; break; }
+  for (let i = 0; i <= buf.length - 8; i++) if (vista.getFloat64(i, true) === pesetas) { primera = i; break; }
   if (primera === -1) return null;
   let enc = null;
   for (let p = Math.max(2, primera - 30000); p < primera; p++) { const c = clubEn(buf, p); if (c) enc = c; }
@@ -1231,6 +1232,10 @@ $('btn-localizar').addEventListener('click', () => {
     if (!estado.buffer) throw new Error('Primero abrí una partida.');
     const caja = localizarCaja(estado.buffer, pesosMostrados);
     mostrarCajaLocalizada(caja);
+    // Con la caja localizada a mano ya podemos anclar el plantel y el estadio
+    // (partidas recién creadas, sin libro de balances todavía).
+    renderPlantel();
+    renderEstadio();
     toast('Caja localizada: ' + caja.offsets.length + ' copias');
   } catch (e) {
     estado.caja = null;
@@ -1345,7 +1350,7 @@ function renderPlantel() {
   // setTimeout: deja pintar el "detectando…" antes del escaneo (que tarda ~1s).
   setTimeout(() => {
     let plantel = [];
-    try { plantel = detectarPlantel(estado.buffer); } catch (_) { plantel = []; }
+    try { plantel = detectarPlantel(estado.buffer, estado.caja ? estado.caja.pesetas : undefined); } catch (_) { plantel = []; }
     $('plantel-cargando').style.display = 'none';
     if (plantel.length === 0) {
       $('plantel-vacio').style.display = '';
@@ -1379,10 +1384,10 @@ function renderEstadio() {
   $('input-capacidad').value = '';
   setTimeout(() => {
     let e = null;
-    try { e = detectarEstadio(estado.buffer); } catch (_) { e = null; }
+    try { e = detectarEstadio(estado.buffer, estado.caja ? estado.caja.pesetas : undefined); } catch (_) { e = null; }
     estadioSel = e;
     if (!e) {
-      $('estadio-info').textContent = 'No pude detectar tu estadio en esta partida.';
+      $('estadio-info').textContent = 'No pude detectar tu estadio: se ancla a la caja. En una partida recién creada, ingresá la caja a mano en «Tesorería» y esto se llena solo.';
       $('estadio-cap').textContent = '—';
       $('btn-aplicar-estadio').disabled = true;
       return;

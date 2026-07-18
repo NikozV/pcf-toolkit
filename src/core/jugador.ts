@@ -200,15 +200,19 @@ function parsearRegistroEn(buf: Uint8Array, posPrefijo: number): Jugador | null 
  * Devuelve [] si no puede anclar (no detecta caja) o no encuentra el bloque.
  * Nota: puede no incluir jugadores transfer-listados ni juveniles (quedan en
  * otras secciones del archivo).
+ *
+ * `cajaPesetas` permite pasar el valor exacto de la caja (obtenido con
+ * localizarCaja) cuando la auto-detección falla — ej. partida recién creada
+ * sin libro de balances todavía.
  */
-export function detectarPlantel(buf: Uint8Array): Jugador[] {
-  const caja = detectarCajaActual(buf);
-  if (!caja) return [];
+export function detectarPlantel(buf: Uint8Array, cajaPesetas?: number): Jugador[] {
+  const pesetas = cajaPesetas ?? detectarCajaActual(buf)?.pesetas;
+  if (pesetas === undefined) return [];
 
   // Ubicar la última copia (mayor offset) del valor de caja.
   let ultimaCaja = -1;
   for (let i = 0; i <= buf.length - 8; i++) {
-    if (readFloat64LE(buf, i) === caja.pesetas) ultimaCaja = i;
+    if (readFloat64LE(buf, i) === pesetas) ultimaCaja = i;
   }
   if (ultimaCaja === -1) return [];
 

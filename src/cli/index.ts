@@ -290,11 +290,18 @@ programa
   .command('plantel')
   .description('Lista el plantel del club que manejás (detectado automáticamente)')
   .argument('<archivo>', 'archivo de partida (managXXX.XXX)')
-  .action(async (archivo: string) => {
+  .option('--pesos <n>', 'caja mostrada por el juego (fallback si la auto-detección falla, ej. partida recién creada)')
+  .action(async (archivo: string, opciones: { pesos?: string }) => {
     const save = await SaveFile.load(archivo);
-    const plantel = detectarPlantel(save.data);
+    const cajaPesetas = opciones.pesos !== undefined
+      ? localizarCaja(save.data, Number.parseInt(opciones.pesos, 10)).pesetas
+      : undefined;
+    const plantel = detectarPlantel(save.data, cajaPesetas);
     if (plantel.length === 0) {
-      programa.error('No pude detectar el plantel (partida muy al principio, o formato distinto).');
+      programa.error(
+        'No pude detectar el plantel. Si la partida es recién creada (menos de 2 semanas jugadas), ' +
+          'pasá --pesos <caja mostrada> o jugá un par de semanas y volvé a guardar.',
+      );
     }
     console.log(`Plantel detectado: ${plantel.length} jugadores\n`);
     for (const j of plantel) {
@@ -309,12 +316,19 @@ programa
   .description('Muestra y edita la capacidad del estadio de tu club (detectado automáticamente)')
   .argument('<archivo>', 'archivo de partida (managXXX.XXX)')
   .option('--capacidad <n>', 'nueva capacidad del estadio (en localidades)')
+  .option('--pesos <n>', 'caja mostrada por el juego (fallback si la auto-detección falla, ej. partida recién creada)')
   .option('--salida <ruta>', 'escribir a otra ruta en vez de pisar el archivo (sin backup)')
-  .action(async (archivo: string, opciones: { capacidad?: string; salida?: string }) => {
+  .action(async (archivo: string, opciones: { capacidad?: string; pesos?: string; salida?: string }) => {
     const save = await SaveFile.load(archivo);
-    const estadio = detectarEstadio(save.data);
+    const cajaPesetas = opciones.pesos !== undefined
+      ? localizarCaja(save.data, Number.parseInt(opciones.pesos, 10)).pesetas
+      : undefined;
+    const estadio = detectarEstadio(save.data, cajaPesetas);
     if (!estadio) {
-      programa.error('No pude detectar tu estadio (partida muy al principio o formato distinto).');
+      programa.error(
+        'No pude detectar tu estadio. Si la partida es recién creada (menos de 2 semanas jugadas), ' +
+          'pasá --pesos <caja mostrada> o jugá un par de semanas y volvé a guardar.',
+      );
     }
 
     console.log(`Club: ${estadio!.nombreClub}`);

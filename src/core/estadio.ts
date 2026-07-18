@@ -60,13 +60,16 @@ function clubEn(buf: Uint8Array, pos: number): Estadio | null {
  * Detecta el estadio del club que maneja el usuario: el último registro de club
  * (3 strings + capacidad plausible) antes de la primera copia de la caja.
  * Devuelve null si no puede anclar.
+ *
+ * `cajaPesetas` permite pasar el valor exacto de la caja (de localizarCaja)
+ * cuando la auto-detección falla — ej. partida recién creada.
  */
-export function detectarEstadio(buf: Uint8Array): Estadio | null {
-  const caja = detectarCajaActual(buf);
-  if (!caja) return null;
+export function detectarEstadio(buf: Uint8Array, cajaPesetas?: number): Estadio | null {
+  const pesetas = cajaPesetas ?? detectarCajaActual(buf)?.pesetas;
+  if (pesetas === undefined) return null;
   let primeraCaja = -1;
   for (let i = 0; i <= buf.length - 8; i++) {
-    if (readFloat64LE(buf, i) === caja.pesetas) { primeraCaja = i; break; }
+    if (readFloat64LE(buf, i) === pesetas) { primeraCaja = i; break; }
   }
   if (primeraCaja === -1) return null;
 
