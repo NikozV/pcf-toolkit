@@ -50,9 +50,9 @@
         "clave_xor": 97,
         "nota": "Confirmado 2026-07-16 contra fixtures/manag003-inicial.000 (partida recién creada, PCF6 Apertura 98-99): los strings están ofuscados con XOR 0x61 byte a byte. Decodificando el archivo completo aparecen 'F.C. Barcelona', 'Camp Nou', 'Patrick KLUIVERT', 'GUARDIOLA', 'LUIS ENRIQUE', 'Emmanuel AMUNIKE', 'Estadio', 'RIQUELME', 'PALERMO', 'SAVIOLA'. En el archivo original, sin decodificar, esas palabras NO aparecen. Excepción notable: 'Van Gaal' aparece en ASCII plano en 0x183 (¿strings ingresados por el usuario se guardan sin ofuscar?)."
       },
-      "atributos_jugador_crudos": {
-        "estado": "hipotesis",
-        "nota": "Junto a cada nombre decodificado hay corridas de 8-13 bytes con valores ~40..95 (ej. 87,82,80,89,81,81,77,83 junto a Amunike) que parecen ser los atributos SIN ofuscar (binario crudo). Falta confirmar contra los valores visibles en el juego."
+      "atributos_jugador": {
+        "estado": "parcial-confirmado",
+        "nota": "CONFIRMADO 2026-07-17 contra la ficha real de Serghei DINOV (arquero de San Martín Mza) en fixtures/manag003-semana4.000. Los atributos son bytes crudos consecutivos (1 byte c/u, sin XOR), ubicados DESPUÉS del nombre largo del jugador (para Dinov: nombre corto en 0x1A31BF, bloque de atributos en 0x1A326A = +171 del nombre corto; el offset exacto depende del largo de los dos strings, así que hay que parsear [len u16][corto][len u16][largo] y leer a partir de ahí). Orden interno confirmado (9 primeros, coinciden EXACTO con pantalla): velocidad(51), resistencia(61), agresividad(63), calidad(66), regate(67), remate(62), pase(71), tiro(63), entradas/robos(70). Luego byte 72 (10º), y más adelante moral(56) en +182. El bloque de 10 valores aparece DUPLICADO (+171 y +184): probablemente 'temporada actual' + 'próxima temporada' (coincide con la hipótesis de los foros). ABIERTO: (a) el 10º byte es 72 pero la pantalla muestra ARQUERO 96 — la habilidad de portero se guardaría o mostraría distinto (¿derivada?, ¿escalada solo para arqueros?); (b) falta ubicar E.FORMA(45) y energía; (c) confirmar el orden con un jugador de campo (no arquero), que muestre ENTRADAS y desambigüe los últimos slots. Datos físicos pegados al bloque: altura(174) y peso(76) en +195/+196."
       },
       "formato_strings": {
         "estado": "confirmado",
