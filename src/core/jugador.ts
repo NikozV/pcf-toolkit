@@ -15,7 +15,8 @@
  * Los atributos son bytes CRUDOS (sin XOR), en rango 1..99.
  */
 
-import { readUint16LE, readUint8, writeUint8 } from './buffer';
+import { readFloat64LE, readUint16LE, readUint8, writeUint8 } from './buffer';
+import { detectarCajaActual } from './caja';
 
 /** Orden interno de los 10 atributos principales (confirmado, ver offsets.json). */
 export const ATRIBUTOS = [
@@ -159,4 +160,81 @@ export function escribirAtributos(
     writeUint8(buf, offsetAtributos + idx, valor);
     writeUint8(buf, offsetAtributos + OFFSET_PROXIMA_TEMPORADA + idx, valor);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Detección del plantel del club del usuario
+// ---------------------------------------------------------------------------
+
+/** Nombre corto plausible (letras/acentos/espacios/puntos), no basura binaria. */
+const NOMBRE_CORTO_OK = /^[A-Za-zÀ-ÿ.\- ]{2,24}$/;
+
+/**
+ * Intenta leer un registro de jugador cuyo prefijo de largo del nombre corto
+ * está en `posPrefijo`. Devuelve el jugador o null si no es un registro válido.
+ */
+function parsearRegistroEn(buf: Uint8Array, posPrefijo: number): Jugador | null {
+  const corto = leerStringLargo(buf, posPrefijo);
+  if (!corto || !NOMBRE_CORTO_OK.test(corto.texto)) return null;
+  const largo = leerStringLargo(buf, corto.fin);
+  if (!largo) return null;
+  const offsetAtributos = largo.fin + GAP_A_ATRIBUTOS;
+  if (!bloqueValido(buf, offsetAtributos)) return null;
+  return {
+    offsetNombre: posPrefijo + 2,
+    nombreCorto: corto.texto,
+    nombreLargo: largo.texto,
+    offsetAtributos,
+    atributos: leerAtributos(buf, offsetAtributos),
+  };
+}
+
+/**
+ * Detecta el plantel del club que maneja el usuario.
+ *
+ * El juego agrupa a los jugadores por club en bloques contiguos de registros;
+ * el bloque del club del usuario está anclado justo después de la última copia
+ * de la caja (ver data/offsets.json → plantel_usuario). Se recorren registros
+ * contiguos hasta que se corta el bloque.
+ *
+ * Devuelve [] si no puede anclar (no detecta caja) o no encuentra el bloque.
+ * Nota: puede no incluir jugadores transfer-listados ni juveniles (quedan en
+ * otras secciones del archivo).
+ */
+export function detectarPlantel(buf: Uint8Array): Jugador[] {
+  const caja = detectarCajaActual(buf);
+  if (!caja) return [];
+
+  // Ubicar la última copia (mayor offset) del valor de caja.
+  let ultimaCaja = -1;
+  for (let i = 0; i <= buf.length - 8; i++) {
+    if (readFloat64LE(buf, i) === caja.pesetas) ultimaCaja = i;
+  }
+  if (ultimaCaja === -1) return [];
+
+  // Primer registro de jugador después de la caja (ventana de 512 bytes).
+  let inicio = -1;
+  for (let p = ultimaCaja; p < ultimaCaja + 512 && p < buf.length; p++) {
+    if (parsearRegistroEn(buf, p)) { inicio = p; break; }
+  }
+  if (inicio === -1) return [];
+
+  // Recorrer registros contiguos: el próximo prefijo aparece dentro de una
+  // ventana tras el bloque de atributos del actual.
+  const plantel: Jugador[] = [];
+  let pos = inicio;
+  const vistos = new Set<number>();
+  while (pos > 0 && !vistos.has(pos) && plantel.length < 80) {
+    vistos.add(pos);
+    const j = parsearRegistroEn(buf, pos);
+    if (!j) break;
+    plantel.push(j);
+    let sig = -1;
+    for (let p = j.offsetAtributos + 10; p < j.offsetAtributos + 700 && p < buf.length; p++) {
+      if (parsearRegistroEn(buf, p)) { sig = p; break; }
+    }
+    if (sig === -1) break;
+    pos = sig;
+  }
+  return plantel;
 }

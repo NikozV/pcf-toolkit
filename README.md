@@ -28,6 +28,9 @@ pnpm pcf caja fixtures/manag003.000 --set 50000000
 # Si la auto-detección falla (partida recién empezada), pasá el valor a mano:
 pnpm pcf caja fixtures/manag003.000 --pesos 755149
 
+# Listar el plantel de tu club (se detecta automáticamente)
+pnpm pcf plantel fixtures/manag003.000
+
 # Ver los atributos de un jugador (busca por nombre corto)
 pnpm pcf jugador fixtures/manag003.000 Palermo
 

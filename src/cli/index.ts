@@ -15,6 +15,7 @@ import {
   ATRIBUTO_MAX,
   ATRIBUTO_MIN,
   buscarJugadores,
+  detectarPlantel,
   escribirAtributos,
   ETIQUETAS,
   leerAtributos,
@@ -282,6 +283,24 @@ programa
       console.log(`Backup del original: ${backup}`);
     }
     console.log('Se editaron las dos temporadas (actual y próxima). Recordá: con el juego cerrado.');
+  });
+
+programa
+  .command('plantel')
+  .description('Lista el plantel del club que manejás (detectado automáticamente)')
+  .argument('<archivo>', 'archivo de partida (managXXX.XXX)')
+  .action(async (archivo: string) => {
+    const save = await SaveFile.load(archivo);
+    const plantel = detectarPlantel(save.data);
+    if (plantel.length === 0) {
+      programa.error('No pude detectar el plantel (partida muy al principio, o formato distinto).');
+    }
+    console.log(`Plantel detectado: ${plantel.length} jugadores\n`);
+    for (const j of plantel) {
+      const prom = Math.round(ATRIBUTOS.reduce((s, a) => s + j.atributos[a], 0) / ATRIBUTOS.length);
+      console.log(`  ${j.nombreLargo.padEnd(34)} prom≈${prom}  (${j.nombreCorto})`);
+    }
+    console.log('\nPara editar uno: pcf jugador <archivo> <nombre> --set ...');
   });
 
 programa.parseAsync().catch((error: unknown) => {
