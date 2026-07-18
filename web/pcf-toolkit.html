@@ -272,6 +272,41 @@
   }
   .attr-fila.cambiado .attr-val { color: var(--dorado); }
 
+  /* ---------- paneles colapsables ---------- */
+  details.panel {
+    background: linear-gradient(180deg, var(--panel), var(--fondo-2));
+    border: 1px solid var(--borde-suave); border-radius: var(--radio);
+    box-shadow: var(--sombra); overflow: hidden;
+  }
+  details.panel + details.panel { margin-top: 18px; }
+  details.panel > summary {
+    list-style: none; cursor: pointer; user-select: none;
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px 22px; font-size: 16px; font-weight: 600;
+  }
+  details.panel > summary::-webkit-details-marker { display: none; }
+  details.panel > summary::before {
+    content: "▸"; color: var(--verde); font-size: 13px; transition: transform .15s;
+  }
+  details.panel[open] > summary::before { transform: rotate(90deg); }
+  details.panel > summary .resumen { margin-left: auto; font-size: 13px; color: var(--texto-3); font-weight: 400; font-family: var(--mono); }
+  details.panel .panel-body { padding: 0 22px 22px; }
+  details.panel[open] > summary { border-bottom: 1px solid var(--borde-suave); margin-bottom: 18px; }
+
+  .grid-plantel { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 10px; }
+  .card-jug {
+    display: flex; flex-direction: column; gap: 3px; text-align: left;
+    background: var(--fondo); border: 1px solid var(--borde); border-radius: 10px;
+    padding: 11px 13px; cursor: pointer; color: var(--texto); font: inherit;
+    transition: border-color .15s, background .15s, transform .05s;
+  }
+  .card-jug:hover { border-color: var(--verde); background: rgba(53, 208, 127, .05); }
+  .card-jug:active { transform: translateY(1px); }
+  .card-jug.sel { border-color: var(--verde); background: rgba(53, 208, 127, .09); }
+  .card-jug .cj-nombre { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-jug .cj-largo { font-size: 11px; color: var(--texto-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-jug .cj-prom { font: 600 12px var(--mono); color: var(--azul); margin-top: 2px; }
+
   .aviso {
     display: none; margin-top: 12px; padding: 10px 14px;
     border-radius: 9px; font-size: 13px;
@@ -398,104 +433,112 @@
       </div>
     </section>
 
-    <section class="tarjeta" id="seccion-caja" style="display:none">
-      <h2><span class="paso">2</span> Tu caja</h2>
+    <details class="panel" id="panel-teso" style="display:none">
+      <summary>💰 Tesorería <span class="resumen" id="resumen-teso"></span></summary>
+      <div class="panel-body">
+        <div id="seccion-caja">
+          <!-- Auto-detección: se llena solo al cargar la partida -->
+          <div id="aviso-autodetec" class="aviso ok" style="display:none"></div>
 
-      <!-- Auto-detección: se llena solo al cargar la partida -->
-      <div id="aviso-autodetec" class="aviso ok" style="display:none"></div>
-
-      <!-- Fallback manual: solo si no se pudo auto-detectar -->
-      <div id="bloque-manual" style="display:none">
-        <div class="aviso info visible" style="margin-bottom:12px">
-          No pude leer la caja sola (partida muy al principio o formato distinto). Ponela como la muestra la pantalla de finanzas del juego.
-        </div>
-        <div class="fila">
-          <div class="crece">
-            <label for="input-pesos">Caja actual <b>exacta</b> (en $, sin puntos)</label>
-            <input type="text" id="input-pesos" inputmode="numeric" placeholder="755149"
-                   autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-caja-actual" readonly>
+          <!-- Fallback manual: solo si no se pudo auto-detectar -->
+          <div id="bloque-manual" style="display:none">
+            <div class="aviso info visible" style="margin-bottom:12px">
+              No pude leer la caja sola (partida muy al principio o formato distinto). Ponela como la muestra la pantalla de finanzas del juego.
+            </div>
+            <div class="fila">
+              <div class="crece">
+                <label for="input-pesos">Caja actual <b>exacta</b> (en $, sin puntos)</label>
+                <input type="text" id="input-pesos" inputmode="numeric" placeholder="755149"
+                       autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-caja-actual" readonly>
+              </div>
+              <button class="boton primario" id="btn-localizar">🔍 Localizar</button>
+            </div>
+            <div class="aviso error" id="error-localizar"></div>
           </div>
-          <button class="boton primario" id="btn-localizar">🔍 Localizar</button>
+
+          <div class="resultado-caja" id="resultado-caja">
+            <div class="valor-grande"><span id="caja-pesos"></span> <small>$</small></div>
+            <div class="sub-valor" id="caja-pesetas"></div>
+            <div class="chips" id="chips-copias"></div>
+            <details class="hex">
+              <summary>Ver bytes en el archivo</summary>
+              <div class="volcado" id="volcado-hex"></div>
+            </details>
+          </div>
         </div>
-        <div class="aviso error" id="error-localizar"></div>
-      </div>
 
-      <div class="resultado-caja" id="resultado-caja">
-        <div style="margin-top:18px">
-          <div class="valor-grande"><span id="caja-pesos"></span> <small>$</small></div>
-          <div class="sub-valor" id="caja-pesetas"></div>
-          <div class="chips" id="chips-copias"></div>
-          <details class="hex">
-            <summary>Ver bytes en el archivo</summary>
-            <div class="volcado" id="volcado-hex"></div>
-          </details>
-        </div>
-      </div>
-    </section>
+        <div id="seccion-editar" style="display:none">
+          <div class="sugerencias" id="sugerencias" style="margin-top:18px"></div>
 
-    <section class="tarjeta" id="seccion-editar" style="display:none">
-      <h2><span class="paso">3</span> Editar</h2>
+          <label for="input-nueva">Valor a medida (en $)</label>
+          <div class="fila">
+            <div class="crece"><input type="text" id="input-nueva" inputmode="numeric" placeholder="50000000"
+                   autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-caja-nueva" readonly></div>
+            <button class="boton primario" id="btn-aplicar" disabled>✏️ Aplicar</button>
+          </div>
 
-      <div class="sugerencias" id="sugerencias"></div>
+          <div class="medidor">
+            <div class="barra"><div class="relleno" id="medidor-relleno"></div></div>
+            <div class="leyenda">
+              <span>0 $</span>
+              <span id="medidor-texto">zona probada: hasta 66.666.666 $</span>
+            </div>
+          </div>
 
-      <label for="input-nueva">Valor a medida (en $)</label>
-      <div class="fila">
-        <div class="crece"><input type="text" id="input-nueva" inputmode="numeric" placeholder="50000000"
-               autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-caja-nueva" readonly></div>
-        <button class="boton primario" id="btn-aplicar" disabled>✏️ Aplicar</button>
-      </div>
+          <div class="aviso" id="aviso-editar"></div>
 
-      <div class="medidor">
-        <div class="barra"><div class="relleno" id="medidor-relleno"></div></div>
-        <div class="leyenda">
-          <span>0 $</span>
-          <span id="medidor-texto">zona probada: hasta 66.666.666 $</span>
-        </div>
-      </div>
-
-      <div class="aviso" id="aviso-editar"></div>
-
-      <div class="fila" style="margin-top:16px">
-        <button class="boton primario crece" id="btn-guardar" disabled>💾 Guardar en el archivo</button>
-      </div>
-      <div class="aviso info" id="nota-guardado" style="margin-top:10px"></div>
-    </section>
-
-    <section class="tarjeta" id="seccion-jugadores" style="display:none">
-      <h2><span class="paso">★</span> Jugadores</h2>
-      <div class="fila">
-        <div class="crece">
-          <label for="input-jugador">Buscar jugador por nombre</label>
-          <input type="text" id="input-jugador" placeholder="Palermo"
-                 autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-jug">
-        </div>
-        <button class="boton primario" id="btn-buscar-jugador">🔍 Buscar</button>
-      </div>
-      <div class="aviso error" id="error-jugador"></div>
-
-      <div class="lista-jug" id="lista-jugadores"></div>
-
-      <div id="editor-jugador" style="display:none">
-        <div style="margin:14px 0 4px">
-          <div class="valor-grande" style="font-size:22px" id="jug-nombre"></div>
-          <div class="sub-valor" id="jug-sub"></div>
-        </div>
-        <div class="grid-attrs" id="grid-attrs"></div>
-        <div class="aviso info" id="jug-nota-arquero" style="display:none">
-          Ojo: este parece un arquero. El juego muestra en pantalla un valor de «Arquero» calculado, mayor al que guardás acá.
-        </div>
-        <div class="fila" style="margin-top:6px">
-          <button class="boton chico" id="btn-todo-99">Todo a 99</button>
-          <button class="boton chico" id="btn-reset-jug">Deshacer</button>
-          <span class="crece"></span>
-          <button class="boton primario" id="btn-aplicar-jugador">✏️ Aplicar cambios</button>
-        </div>
-        <div class="aviso" id="aviso-jugador"></div>
-        <div class="fila" style="margin-top:14px">
-          <button class="boton primario crece" id="btn-guardar-jug" disabled>💾 Guardar en el archivo</button>
+          <div class="fila" style="margin-top:16px">
+            <button class="boton primario crece" id="btn-guardar" disabled>💾 Guardar en el archivo</button>
+          </div>
+          <div class="aviso info" id="nota-guardado" style="margin-top:10px"></div>
         </div>
       </div>
-    </section>
+    </details>
+
+    <details class="panel" id="panel-plantel" style="display:none">
+      <summary>👥 Plantel <span class="resumen" id="resumen-plantel"></span></summary>
+      <div class="panel-body">
+        <div id="plantel-cargando" class="pista-chica" style="display:none">Detectando tu plantel…</div>
+        <div class="grid-plantel" id="grid-plantel"></div>
+        <div id="plantel-vacio" class="aviso info" style="display:none">
+          No pude detectar el plantel automáticamente (partida muy al principio). Buscá un jugador por nombre abajo.
+        </div>
+
+        <details style="margin-top:16px">
+          <summary style="cursor:pointer; font-size:12.5px; color:var(--texto-3)">Buscar cualquier jugador por nombre</summary>
+          <div class="fila" style="margin-top:10px">
+            <div class="crece">
+              <input type="text" id="input-jugador" placeholder="Palermo"
+                     autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-jug">
+            </div>
+            <button class="boton primario" id="btn-buscar-jugador">🔍 Buscar</button>
+          </div>
+          <div class="aviso error" id="error-jugador"></div>
+          <div class="lista-jug" id="lista-jugadores"></div>
+        </details>
+
+        <div id="editor-jugador" style="display:none">
+          <div style="margin:16px 0 4px">
+            <div class="valor-grande" style="font-size:22px" id="jug-nombre"></div>
+            <div class="sub-valor" id="jug-sub"></div>
+          </div>
+          <div class="grid-attrs" id="grid-attrs"></div>
+          <div class="aviso info" id="jug-nota-arquero" style="display:none">
+            Ojo: este parece un arquero. El juego muestra en pantalla un valor de «Arquero» calculado, mayor al que guardás acá.
+          </div>
+          <div class="fila" style="margin-top:6px">
+            <button class="boton chico" id="btn-todo-99">Todo a 99</button>
+            <button class="boton chico" id="btn-reset-jug">Deshacer</button>
+            <span class="crece"></span>
+            <button class="boton primario" id="btn-aplicar-jugador">✏️ Aplicar cambios</button>
+          </div>
+          <div class="aviso" id="aviso-jugador"></div>
+          <div class="fila" style="margin-top:14px">
+            <button class="boton primario crece" id="btn-guardar-jug" disabled>💾 Guardar en el archivo</button>
+          </div>
+        </div>
+      </div>
+    </details>
 
   </div>
 
@@ -732,6 +775,46 @@ function escribirAtributos(buf, off, valores) {
   }
 }
 
+// Detección del plantel del club del usuario (port de src/core/jugador.ts).
+const NOMBRE_CORTO_OK = /^[A-Za-zÀ-ÿ.\- ]{2,24}$/;
+function parsearRegistroEn(buf, posPrefijo) {
+  const corto = leerStringLargoJug(buf, posPrefijo);
+  if (!corto || !NOMBRE_CORTO_OK.test(corto.texto)) return null;
+  const largo = leerStringLargoJug(buf, corto.fin);
+  if (!largo) return null;
+  const off = largo.fin + GAP_A_ATRIBUTOS;
+  if (!bloqueAttrValido(buf, off)) return null;
+  return { offsetNombre: posPrefijo + 2, nombreCorto: corto.texto, nombreLargo: largo.texto, offsetAtributos: off, atributos: leerAtributos(buf, off) };
+}
+function detectarPlantel(buf) {
+  const caja = detectarCajaActual(buf);
+  if (!caja) return [];
+  const vista = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let ultima = -1;
+  for (let i = 0; i <= buf.length - 8; i++) if (vista.getFloat64(i, true) === caja.pesetas) ultima = i;
+  if (ultima === -1) return [];
+  let inicio = -1;
+  for (let p = ultima; p < ultima + 512 && p < buf.length; p++) if (parsearRegistroEn(buf, p)) { inicio = p; break; }
+  if (inicio === -1) return [];
+  const plantel = [];
+  let pos = inicio;
+  const vistos = new Set();
+  while (pos > 0 && !vistos.has(pos) && plantel.length < 80) {
+    vistos.add(pos);
+    const j = parsearRegistroEn(buf, pos);
+    if (!j) break;
+    plantel.push(j);
+    let sig = -1;
+    for (let p = j.offsetAtributos + 10; p < j.offsetAtributos + 700 && p < buf.length; p++) if (parsearRegistroEn(buf, p)) { sig = p; break; }
+    if (sig === -1) break;
+    pos = sig;
+  }
+  return plantel;
+}
+function promedioAttrs(attrs) {
+  return Math.round(ATRIBUTOS.reduce((s, a) => s + attrs[a], 0) / ATRIBUTOS.length);
+}
+
 function sugerirCaja(cajaActualPesos) {
   const redondear = (p) => Math.floor(p / 50000) * 50000;
   const discreta = Math.min(Math.max(redondear(cajaActualPesos * 5), 1000000), 5000000);
@@ -847,9 +930,10 @@ async function cargarDesdeFile(file, handle) {
   $('nombre-archivo').textContent = file.name;
   $('meta-archivo').textContent = fmt.format(bytes.length) + ' bytes · ' +
     (estado.handle ? 'guardado directo disponible' : 'sin acceso directo: al guardar se descarga el archivo');
-  $('seccion-caja').style.display = '';
+  $('panel-teso').style.display = '';
+  $('panel-teso').open = true;
   $('seccion-editar').style.display = 'none';
-  $('seccion-jugadores').style.display = '';
+  $('panel-plantel').style.display = '';
   $('input-jugador').value = '';
   resetSeccionJugadores();
   $('resultado-caja').classList.remove('visible');
@@ -860,6 +944,9 @@ async function cargarDesdeFile(file, handle) {
     ? 'Al guardar se escribe directo sobre ' + file.name + ' (el navegador te va a pedir permiso la primera vez).'
     : 'Este navegador no permite escribir el archivo en el lugar: al guardar se descarga ' + file.name + ' y lo copiás vos a la carpeta TACTICS.';
   $('nota-guardado').classList.add('visible');
+
+  // Detectar y renderizar el plantel (asíncrono para no trabar la UI).
+  renderPlantel();
 
   // Intento de auto-detección: si funciona, mostramos la caja sin pedir nada.
   const detectada = detectarCajaActual(estado.buffer);
@@ -1080,6 +1167,7 @@ function mostrarCajaLocalizada(caja) {
   $('volcado-hex').innerHTML = caja.offsets.map(volcadoHex).join('\n');
   $('resultado-caja').classList.add('visible');
   $('seccion-editar').style.display = '';
+  $('resumen-teso').textContent = fmt.format(caja.pesos) + ' $';
   pintarSugerencias();
   $('btn-guardar').disabled = !estado.sucio;
 }
@@ -1194,6 +1282,41 @@ function resetSeccionJugadores() {
   ocultar('error-jugador');
   ocultar('aviso-jugador');
   jugadorSel = null;
+}
+
+// Detecta y dibuja el plantel del club como una grilla de tarjetas.
+function renderPlantel() {
+  const grid = $('grid-plantel');
+  grid.innerHTML = '';
+  $('plantel-vacio').style.display = 'none';
+  $('plantel-cargando').style.display = '';
+  $('resumen-plantel').textContent = '';
+  // setTimeout: deja pintar el "detectando…" antes del escaneo (que tarda ~1s).
+  setTimeout(() => {
+    let plantel = [];
+    try { plantel = detectarPlantel(estado.buffer); } catch (_) { plantel = []; }
+    $('plantel-cargando').style.display = 'none';
+    if (plantel.length === 0) {
+      $('plantel-vacio').style.display = '';
+      return;
+    }
+    $('resumen-plantel').textContent = plantel.length + ' jugadores';
+    for (const j of plantel) {
+      const card = document.createElement('button');
+      card.className = 'card-jug';
+      card.innerHTML =
+        '<span class="cj-nombre">' + j.nombreCorto + '</span>' +
+        '<span class="cj-largo">' + j.nombreLargo + '</span>' +
+        '<span class="cj-prom">media ' + promedioAttrs(j.atributos) + '</span>';
+      card.addEventListener('click', () => {
+        grid.querySelectorAll('.card-jug').forEach((c) => c.classList.remove('sel'));
+        card.classList.add('sel');
+        abrirEditorJugador(j);
+        $('editor-jugador').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+      grid.appendChild(card);
+    }
+  }, 30);
 }
 
 $('btn-buscar-jugador').addEventListener('click', () => {
