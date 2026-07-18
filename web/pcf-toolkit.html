@@ -540,6 +540,27 @@
       </div>
     </details>
 
+    <details class="panel" id="panel-estadio" style="display:none">
+      <summary>🏟️ Estadio <span class="resumen" id="resumen-estadio"></span></summary>
+      <div class="panel-body">
+        <div class="sub-valor" id="estadio-info" style="margin-bottom:10px"></div>
+        <div class="valor-grande" style="font-size:30px"><span id="estadio-cap"></span> <small>localidades</small></div>
+
+        <label for="input-capacidad" style="margin-top:16px">Nueva capacidad (localidades)</label>
+        <div class="fila">
+          <div class="crece"><input type="text" id="input-capacidad" inputmode="numeric" placeholder="80000"
+                 autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-cap" readonly></div>
+          <button class="boton primario" id="btn-aplicar-estadio">✏️ Aplicar</button>
+        </div>
+        <div class="pista-chica" style="margin-top:6px">Tope prudente: 150.000. Un estadio enorme aumenta mucho tus ingresos por partido.</div>
+        <div class="aviso" id="aviso-estadio"></div>
+
+        <div class="fila" style="margin-top:14px">
+          <button class="boton primario crece" id="btn-guardar-est" disabled>💾 Guardar en el archivo</button>
+        </div>
+      </div>
+    </details>
+
   </div>
 
   <aside class="lateral"><!-- columna secundaria -->
@@ -560,10 +581,10 @@
         </div>
       </div>
       <div class="item-mapa">
-        <span class="insignia ok">Verificado</span>
+        <span class="insignia ok">Confirmado</span>
         <div>
           <div class="titulo-item">Estadio: capacidad</div>
-          <div class="desc-item">int32 a +12 del bloque del club (validado contra 5 clubes + pantalla). Año de fundación a +0. Edición: tras confirmar con diff de una remodelación.</div>
+          <div class="desc-item">int32 a +12 del bloque del club. Confirmado con 5 clubes + pantalla + diff (ampliación 20.000→32.000). Editable acá.</div>
         </div>
       </div>
       <div class="item-mapa">
@@ -815,6 +836,35 @@ function promedioAttrs(attrs) {
   return Math.round(ATRIBUTOS.reduce((s, a) => s + attrs[a], 0) / ATRIBUTOS.length);
 }
 
+// Estadio — port de src/core/estadio.ts. La capacidad es un int32 LE a +12 del
+// fin de los 3 strings del club; el club del usuario es el último registro de
+// club antes de la primera copia de la caja.
+const CAP_MIN = 500, CAP_MAX = 150000;
+const NOMBRE_CLUB_OK = /^[A-Za-zÀ-ÿ0-9.,'"()\- ]{2,40}$/;
+function clubEn(buf, pos) {
+  const corto = leerStringLargoJug(buf, pos); if (!corto || !NOMBRE_CLUB_OK.test(corto.texto)) return null;
+  const estadio = leerStringLargoJug(buf, corto.fin); if (!estadio || !NOMBRE_CLUB_OK.test(estadio.texto)) return null;
+  const largo = leerStringLargoJug(buf, estadio.fin); if (!largo || !NOMBRE_CLUB_OK.test(largo.texto)) return null;
+  const off = largo.fin + 12;
+  const cap = new DataView(buf.buffer, buf.byteOffset, buf.byteLength).getInt32(off, true);
+  if (cap < CAP_MIN || cap > 200000) return null;
+  return { nombreClub: corto.texto, nombreEstadio: estadio.texto, capacidad: cap, offsetCapacidad: off };
+}
+function detectarEstadio(buf) {
+  const caja = detectarCajaActual(buf); if (!caja) return null;
+  const vista = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let primera = -1;
+  for (let i = 0; i <= buf.length - 8; i++) if (vista.getFloat64(i, true) === caja.pesetas) { primera = i; break; }
+  if (primera === -1) return null;
+  let enc = null;
+  for (let p = Math.max(2, primera - 30000); p < primera; p++) { const c = clubEn(buf, p); if (c) enc = c; }
+  return enc;
+}
+function escribirCapacidad(buf, off, nueva) {
+  if (!Number.isInteger(nueva) || nueva < CAP_MIN || nueva > CAP_MAX) throw new Error('Capacidad fuera de rango (' + CAP_MIN + '..' + fmt.format(CAP_MAX) + ').');
+  new DataView(buf.buffer, buf.byteOffset, buf.byteLength).setInt32(off, nueva, true);
+}
+
 function sugerirCaja(cajaActualPesos) {
   const redondear = (p) => Math.floor(p / 50000) * 50000;
   const discreta = Math.min(Math.max(redondear(cajaActualPesos * 5), 1000000), 5000000);
@@ -845,7 +895,7 @@ const soportaCarpetas = 'showDirectoryPicker' in window;
 
 // Los campos numéricos arrancan readonly para que el navegador NO los
 // autocomplete solo; al primer foco/clic se habilitan para tipear.
-for (const id of ['input-pesos', 'input-nueva']) {
+for (const id of ['input-pesos', 'input-nueva', 'input-capacidad']) {
   const quitar = () => document.getElementById(id).removeAttribute('readonly');
   const el = document.getElementById(id);
   el.addEventListener('focus', quitar);
@@ -945,8 +995,9 @@ async function cargarDesdeFile(file, handle) {
     : 'Este navegador no permite escribir el archivo en el lugar: al guardar se descarga ' + file.name + ' y lo copiás vos a la carpeta TACTICS.';
   $('nota-guardado').classList.add('visible');
 
-  // Detectar y renderizar el plantel (asíncrono para no trabar la UI).
+  // Detectar y renderizar el plantel y el estadio (async para no trabar la UI).
   renderPlantel();
+  renderEstadio();
 
   // Intento de auto-detección: si funciona, mostramos la caja sin pedir nada.
   const detectada = detectarCajaActual(estado.buffer);
@@ -1319,6 +1370,46 @@ function renderPlantel() {
   }, 30);
 }
 
+// Detecta el estadio del club y arma el panel.
+let estadioSel = null;
+function renderEstadio() {
+  $('panel-estadio').style.display = '';
+  $('resumen-estadio').textContent = '';
+  ocultar('aviso-estadio');
+  $('input-capacidad').value = '';
+  setTimeout(() => {
+    let e = null;
+    try { e = detectarEstadio(estado.buffer); } catch (_) { e = null; }
+    estadioSel = e;
+    if (!e) {
+      $('estadio-info').textContent = 'No pude detectar tu estadio en esta partida.';
+      $('estadio-cap').textContent = '—';
+      $('btn-aplicar-estadio').disabled = true;
+      return;
+    }
+    $('estadio-info').textContent = e.nombreClub + ' · ' + e.nombreEstadio;
+    $('estadio-cap').textContent = fmt.format(e.capacidad);
+    $('resumen-estadio').textContent = fmt.format(e.capacidad) + ' loc.';
+    $('btn-aplicar-estadio').disabled = false;
+  }, 30);
+}
+
+$('btn-aplicar-estadio').addEventListener('click', () => {
+  if (!estadioSel) return;
+  const nueva = parseInt($('input-capacidad').value.replace(/[.\s]/g, ''), 10);
+  if (!Number.isInteger(nueva) || nueva <= 0) { mostrar('aviso-estadio', 'Poné un número de capacidad válido.', 'error'); return; }
+  try {
+    escribirCapacidad(estado.buffer, estadioSel.offsetCapacidad, nueva);
+  } catch (err) { mostrar('aviso-estadio', err.message, 'error'); return; }
+  const anterior = estadioSel.capacidad;
+  estadioSel = { ...estadioSel, capacidad: nueva };
+  $('estadio-cap').textContent = fmt.format(nueva);
+  $('resumen-estadio').textContent = fmt.format(nueva) + ' loc.';
+  marcarSucio();
+  mostrar('aviso-estadio', 'Aplicado en memoria: ' + fmt.format(anterior) + ' → ' + fmt.format(nueva) + ' localidades. Falta guardar.', 'ok');
+});
+$('input-capacidad').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-aplicar-estadio').click(); });
+
 $('btn-buscar-jugador').addEventListener('click', () => {
   ocultar('error-jugador');
   $('lista-jugadores').innerHTML = '';
@@ -1432,6 +1523,7 @@ function marcarSucio() {
   estado.sucio = true;
   $('btn-guardar').disabled = false;
   $('btn-guardar-jug').disabled = false;
+  $('btn-guardar-est').disabled = false;
   ponerEstado(estado.nombre + ' — cambios sin guardar', 'sucio');
 }
 
@@ -1454,6 +1546,7 @@ async function guardarArchivo() {
     estado.sucio = false;
     $('btn-guardar').disabled = true;
     $('btn-guardar-jug').disabled = true;
+    $('btn-guardar-est').disabled = true;
     ponerEstado(estado.nombre + ' — guardado', 'ok');
   } catch (e) {
     toast('Error al guardar: ' + e.message + (e.name === 'NoModificationAllowedError' ? ' (¿está abierto el juego?)' : ''));
@@ -1461,6 +1554,7 @@ async function guardarArchivo() {
 }
 $('btn-guardar').addEventListener('click', guardarArchivo);
 $('btn-guardar-jug').addEventListener('click', guardarArchivo);
+$('btn-guardar-est').addEventListener('click', guardarArchivo);
 
 $('btn-backup').addEventListener('click', () => {
   descargar(estado.original, estado.nombre + '.bak');
@@ -1474,11 +1568,14 @@ $('btn-restaurar').addEventListener('click', () => {
   estado.sucio = false;
   $('btn-guardar').disabled = true;
   $('btn-guardar-jug').disabled = true;
+  $('btn-guardar-est').disabled = true;
   $('resultado-caja').classList.remove('visible');
   $('seccion-editar').style.display = 'none';
   $('input-pesos').value = '';
   $('input-jugador').value = '';
   resetSeccionJugadores();
+  renderPlantel();
+  renderEstadio();
   ocultar('error-localizar');
   ponerEstado(estado.nombre, 'ok');
   toast('Restaurado el contenido original (en memoria).');
