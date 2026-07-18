@@ -10,6 +10,17 @@ import { copyFile } from 'node:fs/promises';
 import { diffSaves, type RangoDiff } from '../reverse-engineering/diff';
 import { readInt32LE, readUint16LE, readUint32LE } from '../core/buffer';
 import { detectarCajaActual, escribirCaja, localizarCaja, pesosAPesetas, TECHO_PESOS } from '../core/caja';
+import {
+  ATRIBUTOS,
+  ATRIBUTO_MAX,
+  ATRIBUTO_MIN,
+  buscarJugadores,
+  escribirAtributos,
+  ETIQUETAS,
+  leerAtributos,
+  type Atributos,
+  type NombreAtributo,
+} from '../core/jugador';
 import { SaveFile } from '../core/save-file';
 import { sugerirCaja } from '../advisor/suggestions';
 
@@ -99,6 +110,23 @@ programa
 
 const pesos = (n: number): string => `${n.toLocaleString('es-AR')} $`;
 
+/**
+ * Guarda el save en el lugar creando antes un backup automático, o a otra ruta
+ * si se pasa `salida` (en ese caso no toca el original). Devuelve la ruta del
+ * backup creado, o null si escribió a otra ruta.
+ */
+async function guardarConBackup(save: SaveFile, archivo: string, salida?: string): Promise<string | null> {
+  if (salida) {
+    await save.write(salida);
+    return null;
+  }
+  const marca = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+  const backup = `${archivo}.bak-${marca}`;
+  await copyFile(archivo, backup);
+  await save.write(archivo, { sobrescribirOriginal: true });
+  return backup;
+}
+
 programa
   .command('caja')
   .description('Localiza la caja del club en un save de PCF6 y permite editarla (siempre sobre una copia)')
@@ -183,6 +211,78 @@ programa
       console.log('Recordá: editá siempre con el juego cerrado.');
     },
   );
+
+programa
+  .command('jugador')
+  .description('Muestra y edita los atributos de un jugador (busca por nombre)')
+  .argument('<archivo>', 'archivo de partida (managXXX.XXX)')
+  .argument('<nombre>', 'nombre corto del jugador (ej: Palermo)')
+  .option('--set <cambios>', 'atributos a cambiar, ej: "velocidad=99,remate=90" (o "todo=99")')
+  .option('--salida <ruta>', 'escribir a otra ruta en vez de pisar el archivo (sin backup)')
+  .action(async (archivo: string, nombre: string, opciones: { set?: string; salida?: string }) => {
+    const save = await SaveFile.load(archivo);
+    const jugadores = buscarJugadores(save.data, nombre);
+
+    if (jugadores.length === 0) {
+      programa.error(`No encontré ningún jugador con nombre "${nombre}" (probá con el nombre corto, ej: Palermo).`);
+    }
+    if (jugadores.length > 1 && opciones.set) {
+      console.log(`Hay ${jugadores.length} jugadores que coinciden con "${nombre}":`);
+      for (const j of jugadores) console.log(`  · ${j.nombreCorto} (${j.nombreLargo})`);
+      programa.error('Para editar necesito un nombre que identifique a uno solo. Afiná el nombre.');
+    }
+
+    const mostrarAtributos = (attrs: Atributos): void => {
+      for (const a of ATRIBUTOS) {
+        console.log(`  ${ETIQUETAS[a].padEnd(18)} ${String(attrs[a]).padStart(3)}`);
+      }
+    };
+
+    if (!opciones.set) {
+      for (const j of jugadores) {
+        console.log(`\n${j.nombreLargo}  (nombre corto: ${j.nombreCorto})`);
+        mostrarAtributos(j.atributos);
+      }
+      console.log('\nNota: en arqueros, el juego muestra en pantalla un "arquero" mayor al valor guardado.');
+      return;
+    }
+
+    // Parsear los cambios: "todo=99" o "velocidad=99,remate=90"
+    const cambios: Partial<Atributos> = {};
+    for (const par of opciones.set.split(',')) {
+      const [clave, valTxt] = par.split('=').map((s) => s.trim());
+      const valor = Number.parseInt(valTxt ?? '', 10);
+      if (!Number.isInteger(valor) || valor < ATRIBUTO_MIN || valor > ATRIBUTO_MAX) {
+        programa.error(`Valor inválido en "${par}": tiene que ser un entero ${ATRIBUTO_MIN}..${ATRIBUTO_MAX}.`);
+      }
+      if (clave === 'todo') {
+        for (const a of ATRIBUTOS) cambios[a] = valor;
+      } else if ((ATRIBUTOS as readonly string[]).includes(clave ?? '')) {
+        cambios[clave as NombreAtributo] = valor;
+      } else {
+        programa.error(`Atributo desconocido: "${clave}". Válidos: ${ATRIBUTOS.join(', ')}, o "todo".`);
+      }
+    }
+
+    const j = jugadores[0]!;
+    console.log(`\n${j.nombreLargo} — antes:`);
+    mostrarAtributos(j.atributos);
+
+    escribirAtributos(save.data, j.offsetAtributos, cambios);
+    const despues = leerAtributos(save.data, j.offsetAtributos);
+
+    console.log(`\n${j.nombreLargo} — después:`);
+    mostrarAtributos(despues);
+
+    const backup = await guardarConBackup(save, archivo, opciones.salida);
+    if (opciones.salida) {
+      console.log(`\nEscrito en: ${opciones.salida} (el original queda intacto)`);
+    } else {
+      console.log(`\nGuardado directo en: ${archivo}`);
+      console.log(`Backup del original: ${backup}`);
+    }
+    console.log('Se editaron las dos temporadas (actual y próxima). Recordá: con el juego cerrado.');
+  });
 
 programa.parseAsync().catch((error: unknown) => {
   const mensaje = error instanceof Error ? error.message : String(error);

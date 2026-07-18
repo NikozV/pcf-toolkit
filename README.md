@@ -28,6 +28,13 @@ pnpm pcf caja fixtures/manag003.000 --set 50000000
 # Si la auto-detección falla (partida recién empezada), pasá el valor a mano:
 pnpm pcf caja fixtures/manag003.000 --pesos 755149
 
+# Ver los atributos de un jugador (busca por nombre corto)
+pnpm pcf jugador fixtures/manag003.000 Palermo
+
+# Editar atributos (guarda directo con backup automático; --salida para otra ruta)
+pnpm pcf jugador fixtures/manag003.000 Palermo --set "velocidad=99,remate=90"
+pnpm pcf jugador fixtures/manag003.000 Palermo --set "todo=99"
+
 # Tests
 pnpm test
 ```
@@ -43,8 +50,9 @@ El hex editor manual ([web/pcf-editor.html](web/pcf-editor.html)) sigue disponib
 - **Fase 1 lista**: capa de bajo nivel — lectura/escritura de bytes, carga segura de archivos, `pcf diff`.
 - **Caja del club (PCF6 Argentina) confirmada y editable**: se guarda como double LE en pesetas (el juego muestra pesos = pesetas/150) en 3 copias que se localizan por valor. Se **auto-detecta** por el libro de balances semanal (no hace falta ingresar el valor). `pcf caja` la encuentra, sugiere valores seguros y guarda directo sobre el archivo con backup automático.
 - **Interfaz gráfica** ([web/pcf-toolkit.html](web/pcf-toolkit.html)): editor visual standalone.
+- **Atributos de jugadores confirmados y editables** (`pcf jugador`): los 10 principales (velocidad, resistencia, agresividad, calidad, regate, remate, pase, tiro, entradas, arquero), mapeados contra fichas reales. Edita las dos temporadas (actual y próxima).
 
-Próximos pasos: bloque de estadio (candidatos ya anotados en `offsets.json`) y atributos de jugadores.
+Próximos pasos: llevar el editor de jugadores a la GUI; bloque de estadio; moral/forma/energía.
 
 ## Online
 
