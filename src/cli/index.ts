@@ -22,6 +22,7 @@ import {
   type Atributos,
   type NombreAtributo,
 } from '../core/jugador';
+import { CAPACIDAD_MAX, detectarEstadio, escribirCapacidad } from '../core/estadio';
 import { SaveFile } from '../core/save-file';
 import { sugerirCaja } from '../advisor/suggestions';
 
@@ -301,6 +302,49 @@ programa
       console.log(`  ${j.nombreLargo.padEnd(34)} prom≈${prom}  (${j.nombreCorto})`);
     }
     console.log('\nPara editar uno: pcf jugador <archivo> <nombre> --set ...');
+  });
+
+programa
+  .command('estadio')
+  .description('Muestra y edita la capacidad del estadio de tu club (detectado automáticamente)')
+  .argument('<archivo>', 'archivo de partida (managXXX.XXX)')
+  .option('--capacidad <n>', 'nueva capacidad del estadio (en localidades)')
+  .option('--salida <ruta>', 'escribir a otra ruta en vez de pisar el archivo (sin backup)')
+  .action(async (archivo: string, opciones: { capacidad?: string; salida?: string }) => {
+    const save = await SaveFile.load(archivo);
+    const estadio = detectarEstadio(save.data);
+    if (!estadio) {
+      programa.error('No pude detectar tu estadio (partida muy al principio o formato distinto).');
+    }
+
+    console.log(`Club: ${estadio!.nombreClub}`);
+    console.log(`Estadio: ${estadio!.nombreEstadio}`);
+    console.log(`Capacidad actual: ${estadio!.capacidad.toLocaleString('es-AR')} localidades`);
+
+    if (opciones.capacidad === undefined) {
+      console.log('\nPara cambiarla: pcf estadio <archivo> --capacidad <n>');
+      return;
+    }
+
+    const nueva = Number.parseInt(opciones.capacidad, 10);
+    if (!Number.isInteger(nueva) || nueva <= 0) {
+      programa.error('--capacidad tiene que ser un entero positivo (sin puntos)');
+    }
+    if (nueva > CAPACIDAD_MAX) {
+      programa.error(`--capacidad ${nueva.toLocaleString('es-AR')} supera el máximo prudente de ${CAPACIDAD_MAX.toLocaleString('es-AR')}.`);
+    }
+
+    escribirCapacidad(save.data, estadio!.offsetCapacidad, nueva);
+
+    const backup = await guardarConBackup(save, archivo, opciones.salida);
+    console.log(`\nListo: capacidad ${estadio!.capacidad.toLocaleString('es-AR')} → ${nueva.toLocaleString('es-AR')}`);
+    if (opciones.salida) {
+      console.log(`Escrito en: ${opciones.salida} (el original queda intacto)`);
+    } else {
+      console.log(`Guardado directo en: ${archivo}`);
+      console.log(`Backup del original: ${backup}`);
+    }
+    console.log('Recordá: con el juego cerrado.');
   });
 
 programa.parseAsync().catch((error: unknown) => {

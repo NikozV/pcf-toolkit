@@ -28,6 +28,10 @@ pnpm pcf caja fixtures/manag003.000 --set 50000000
 # Si la auto-detección falla (partida recién empezada), pasá el valor a mano:
 pnpm pcf caja fixtures/manag003.000 --pesos 755149
 
+# Ver / editar la capacidad del estadio de tu club (se detecta solo)
+pnpm pcf estadio fixtures/manag003.000
+pnpm pcf estadio fixtures/manag003.000 --capacidad 80000
+
 # Listar el plantel de tu club (se detecta automáticamente)
 pnpm pcf plantel fixtures/manag003.000
 
