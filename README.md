@@ -46,6 +46,14 @@ El hex editor manual ([web/pcf-editor.html](web/pcf-editor.html)) sigue disponib
 
 Próximos pasos: bloque de estadio (candidatos ya anotados en `offsets.json`) y atributos de jugadores.
 
+## Online
+
+App publicada en **https://nikozv.github.io/pcf-toolkit/** (GitHub Pages). Corre entera en el navegador: las partidas nunca salen de tu máquina.
+
+## Licencia
+
+[MIT](LICENSE) — usá, modificá y compartí libremente. PC Fútbol es marca de sus respectivos dueños; este es un proyecto de fan, sin relación con ellos.
+
 ---
 
 <sub>elaltillo · 1984–2026</sub>

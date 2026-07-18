@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Editor inteligente de partidas guardadas de PC Fútbol 5.0 / 6.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "pcf": "tsx src/cli/index.ts",
