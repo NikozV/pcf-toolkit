@@ -239,6 +239,39 @@
   }
   .medidor .leyenda { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--texto-3); margin-top: 5px; }
 
+  /* ---------- jugadores ---------- */
+  .lista-jug { display: grid; gap: 8px; margin: 4px 0 8px; }
+  .item-jug {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    background: var(--fondo); border: 1px solid var(--borde); border-radius: 9px;
+    padding: 10px 14px; cursor: pointer; color: var(--texto); font: inherit;
+    transition: border-color .15s, background .15s;
+  }
+  .item-jug:hover { border-color: var(--verde); background: rgba(53, 208, 127, .05); }
+  .item-jug .corto { font-family: var(--mono); font-weight: 600; }
+  .item-jug .largo { font-size: 12.5px; color: var(--texto-3); }
+
+  .grid-attrs { display: grid; gap: 10px; margin: 16px 0; }
+  .attr-fila { display: grid; grid-template-columns: 130px 1fr 46px; align-items: center; gap: 12px; }
+  .attr-fila label { margin: 0; font-size: 13px; color: var(--texto); }
+  .attr-fila input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 99px;
+    background: var(--panel-2); outline: none; cursor: pointer;
+  }
+  .attr-fila input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--verde); border: 2px solid var(--fondo-2); cursor: pointer;
+  }
+  .attr-fila input[type="range"]::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%; background: var(--verde);
+    border: 2px solid var(--fondo-2); cursor: pointer;
+  }
+  .attr-fila .attr-val {
+    font: 600 15px var(--mono); text-align: right; color: var(--verde);
+    font-variant-numeric: tabular-nums;
+  }
+  .attr-fila.cambiado .attr-val { color: var(--dorado); }
+
   .aviso {
     display: none; margin-top: 12px; padding: 10px 14px;
     border-radius: 9px; font-size: 13px;
@@ -428,6 +461,42 @@
       <div class="aviso info" id="nota-guardado" style="margin-top:10px"></div>
     </section>
 
+    <section class="tarjeta" id="seccion-jugadores" style="display:none">
+      <h2><span class="paso">★</span> Jugadores</h2>
+      <div class="fila">
+        <div class="crece">
+          <label for="input-jugador">Buscar jugador por nombre</label>
+          <input type="text" id="input-jugador" placeholder="Palermo"
+                 autocomplete="off" autocorrect="off" spellcheck="false" name="pcf-jug">
+        </div>
+        <button class="boton primario" id="btn-buscar-jugador">🔍 Buscar</button>
+      </div>
+      <div class="aviso error" id="error-jugador"></div>
+
+      <div class="lista-jug" id="lista-jugadores"></div>
+
+      <div id="editor-jugador" style="display:none">
+        <div style="margin:14px 0 4px">
+          <div class="valor-grande" style="font-size:22px" id="jug-nombre"></div>
+          <div class="sub-valor" id="jug-sub"></div>
+        </div>
+        <div class="grid-attrs" id="grid-attrs"></div>
+        <div class="aviso info" id="jug-nota-arquero" style="display:none">
+          Ojo: este parece un arquero. El juego muestra en pantalla un valor de «Arquero» calculado, mayor al que guardás acá.
+        </div>
+        <div class="fila" style="margin-top:6px">
+          <button class="boton chico" id="btn-todo-99">Todo a 99</button>
+          <button class="boton chico" id="btn-reset-jug">Deshacer</button>
+          <span class="crece"></span>
+          <button class="boton primario" id="btn-aplicar-jugador">✏️ Aplicar cambios</button>
+        </div>
+        <div class="aviso" id="aviso-jugador"></div>
+        <div class="fila" style="margin-top:14px">
+          <button class="boton primario crece" id="btn-guardar-jug" disabled>💾 Guardar en el archivo</button>
+        </div>
+      </div>
+    </section>
+
   </div>
 
   <aside class="lateral"><!-- columna secundaria -->
@@ -455,10 +524,10 @@
         </div>
       </div>
       <div class="item-mapa">
-        <span class="insignia investigando">En investigación</span>
+        <span class="insignia ok">Confirmado</span>
         <div>
           <div class="titulo-item">Jugadores</div>
-          <div class="desc-item">Atributos aparentemente en binario crudo junto al nombre. Falta confirmar contra fichas del juego.</div>
+          <div class="desc-item">10 atributos crudos (velocidad, resistencia, calidad, regate, remate, pase, tiro, entradas, agresividad, arquero), mapeados contra fichas reales. Editables acá.</div>
         </div>
       </div>
       <div class="item-mapa">
@@ -592,6 +661,77 @@ function detectarCajaActual(buf) {
   return { pesetas: ultima.pta, pesos: Math.trunc(ultima.pta / PESETAS_POR_PESO), semanas: mejor.length, fecha: ultima.fecha };
 }
 
+/* ============================================================================
+   Atributos de jugador — port de src/core/jugador.ts (fuente de la verdad).
+   ============================================================================ */
+const ATRIBUTOS = ['velocidad', 'resistencia', 'agresividad', 'calidad', 'regate', 'remate', 'pase', 'tiro', 'entradas', 'arquero'];
+const ETIQUETAS_ATTR = {
+  velocidad: 'Velocidad', resistencia: 'Resistencia', agresividad: 'Agresividad', calidad: 'Calidad',
+  regate: 'Regate/Dribbling', remate: 'Remate', pase: 'Pase', tiro: 'Tiro', entradas: 'Entradas/Robos', arquero: 'Arquero',
+};
+const GAP_A_ATRIBUTOS = 151;
+const OFFSET_PROXIMA_TEMPORADA = 13;
+const ATTR_MIN = 1, ATTR_MAX = 99;
+
+function leerStringLargoJug(buf, offPrefijo) {
+  if (offPrefijo < 0 || offPrefijo + 2 > buf.length) return null;
+  const largo = buf[offPrefijo] | (buf[offPrefijo + 1] << 8);
+  if (largo < 1 || largo > 48 || offPrefijo + 2 + largo > buf.length) return null;
+  let texto = '';
+  for (let i = 0; i < largo; i++) {
+    const c = buf[offPrefijo + 2 + i] ^ 0x61;
+    if (c < 0x20 || c === 0x7f) return null;
+    texto += String.fromCharCode(c);
+  }
+  return { texto, fin: offPrefijo + 2 + largo };
+}
+
+function bloqueAttrValido(buf, off) {
+  if (off + 10 > buf.length) return false;
+  for (let i = 0; i < 10; i++) { const v = buf[off + i]; if (v < ATTR_MIN || v > ATTR_MAX) return false; }
+  return true;
+}
+
+function leerAtributos(buf, off) {
+  const out = {};
+  ATRIBUTOS.forEach((n, i) => { out[n] = buf[off + i]; });
+  return out;
+}
+
+function buscarJugadores(buf, nombre) {
+  const objetivo = nombre.trim().toLowerCase();
+  const L = objetivo.length;
+  if (L === 0) throw new Error('El nombre a buscar no puede estar vacío.');
+  const res = [];
+  for (let i = 2; i <= buf.length - L; i++) {
+    if ((buf[i - 2] | (buf[i - 1] << 8)) !== L) continue;
+    let texto = '', ok = true;
+    for (let k = 0; k < L; k++) {
+      const c = buf[i + k] ^ 0x61;
+      if (c < 0x20 || c === 0x7f) { ok = false; break; }
+      texto += String.fromCharCode(c);
+    }
+    if (!ok || texto.toLowerCase() !== objetivo) continue;
+    const largo = leerStringLargoJug(buf, i + L);
+    if (!largo) continue;
+    const offAttr = largo.fin + GAP_A_ATRIBUTOS;
+    if (!bloqueAttrValido(buf, offAttr)) continue;
+    res.push({ offsetNombre: i, nombreCorto: texto, nombreLargo: largo.texto, offsetAtributos: offAttr, atributos: leerAtributos(buf, offAttr) });
+  }
+  return res;
+}
+
+function escribirAtributos(buf, off, valores) {
+  for (const n of Object.keys(valores)) {
+    const idx = ATRIBUTOS.indexOf(n);
+    const v = valores[n];
+    if (idx === -1) throw new Error('Atributo desconocido: ' + n);
+    if (!Number.isInteger(v) || v < ATTR_MIN || v > ATTR_MAX) throw new Error(n + '=' + v + ' fuera de rango (1..99).');
+    buf[off + idx] = v;
+    buf[off + OFFSET_PROXIMA_TEMPORADA + idx] = v;
+  }
+}
+
 function sugerirCaja(cajaActualPesos) {
   const redondear = (p) => Math.floor(p / 50000) * 50000;
   const discreta = Math.min(Math.max(redondear(cajaActualPesos * 5), 1000000), 5000000);
@@ -709,6 +849,9 @@ async function cargarDesdeFile(file, handle) {
     (estado.handle ? 'guardado directo disponible' : 'sin acceso directo: al guardar se descarga el archivo');
   $('seccion-caja').style.display = '';
   $('seccion-editar').style.display = 'none';
+  $('seccion-jugadores').style.display = '';
+  $('input-jugador').value = '';
+  resetSeccionJugadores();
   $('resultado-caja').classList.remove('visible');
   $('input-pesos').value = '';
   ocultar('error-localizar');
@@ -1029,17 +1172,125 @@ $('btn-aplicar').addEventListener('click', () => {
     escribirCaja(estado.buffer, estado.caja.offsets, nueva * PESETAS_POR_PESO);
     const anterior = estado.caja.pesos;
     estado.caja = { ...estado.caja, pesetas: nueva * PESETAS_POR_PESO, pesos: nueva };
-    estado.sucio = true;
     $('caja-pesos').textContent = fmt.format(nueva);
     $('caja-pesetas').textContent = '= ' + fmtDec.format(nueva * PESETAS_POR_PESO) + ' pesetas internas (double LE)';
     $('volcado-hex').innerHTML = estado.caja.offsets.map(volcadoHex).join('\n');
-    $('btn-guardar').disabled = false;
-    ponerEstado(estado.nombre + ' — cambios sin guardar', 'sucio');
+    marcarSucio();
     mostrar('aviso-editar', 'Aplicado en memoria: ' + fmt.format(anterior) + ' $ → ' + fmt.format(nueva) +
       ' $ (' + estado.caja.offsets.length + ' copias). Falta guardar.', 'ok');
   } catch (e) {
     mostrar('aviso-editar', e.message, 'error');
   }
+});
+
+/* ============================================================================
+   Editor de jugadores
+   ============================================================================ */
+let jugadorSel = null; // { offsetAtributos, atributos, nombreLargo, ... }
+
+function resetSeccionJugadores() {
+  $('lista-jugadores').innerHTML = '';
+  $('editor-jugador').style.display = 'none';
+  ocultar('error-jugador');
+  ocultar('aviso-jugador');
+  jugadorSel = null;
+}
+
+$('btn-buscar-jugador').addEventListener('click', () => {
+  ocultar('error-jugador');
+  $('lista-jugadores').innerHTML = '';
+  $('editor-jugador').style.display = 'none';
+  jugadorSel = null;
+  const nombre = $('input-jugador').value.trim();
+  if (!nombre) { mostrar('error-jugador', 'Escribí un nombre para buscar.', 'error'); return; }
+  let encontrados;
+  try { encontrados = buscarJugadores(estado.buffer, nombre); }
+  catch (e) { mostrar('error-jugador', e.message, 'error'); return; }
+
+  if (encontrados.length === 0) {
+    mostrar('error-jugador', 'No encontré ningún jugador con nombre "' + nombre + '". Probá con el nombre corto (ej: Palermo).', 'error');
+    return;
+  }
+  if (encontrados.length === 1) { abrirEditorJugador(encontrados[0]); return; }
+  // Varias coincidencias: mostrar lista para elegir
+  const cont = $('lista-jugadores');
+  for (const j of encontrados) {
+    const b = document.createElement('button');
+    b.className = 'item-jug';
+    b.innerHTML = '<span class="corto">' + j.nombreCorto + '</span><span class="largo">' + j.nombreLargo + '</span>';
+    b.addEventListener('click', () => { $('lista-jugadores').innerHTML = ''; abrirEditorJugador(j); });
+    cont.appendChild(b);
+  }
+});
+$('input-jugador').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-buscar-jugador').click(); });
+
+function abrirEditorJugador(j) {
+  jugadorSel = j;
+  $('jug-nombre').textContent = j.nombreLargo;
+  $('jug-sub').textContent = 'nombre corto: ' + j.nombreCorto + ' · atributos @ 0x' + j.offsetAtributos.toString(16).toUpperCase();
+
+  // ¿Parece arquero? (arquero es el atributo más alto) → mostrar la nota
+  const maxAttr = Math.max(...ATRIBUTOS.map((a) => j.atributos[a]));
+  $('jug-nota-arquero').style.display = (j.atributos.arquero === maxAttr && j.atributos.arquero >= 55) ? 'block' : 'none';
+
+  const grid = $('grid-attrs');
+  grid.innerHTML = '';
+  for (const a of ATRIBUTOS) {
+    const fila = document.createElement('div');
+    fila.className = 'attr-fila';
+    fila.dataset.attr = a;
+    fila.dataset.original = String(j.atributos[a]);
+    fila.innerHTML =
+      '<label>' + ETIQUETAS_ATTR[a] + '</label>' +
+      '<input type="range" min="1" max="99" value="' + j.atributos[a] + '" data-attr="' + a + '">' +
+      '<span class="attr-val">' + j.atributos[a] + '</span>';
+    const range = fila.querySelector('input');
+    const val = fila.querySelector('.attr-val');
+    range.addEventListener('input', () => {
+      val.textContent = range.value;
+      fila.classList.toggle('cambiado', range.value !== fila.dataset.original);
+    });
+    grid.appendChild(fila);
+  }
+  ocultar('aviso-jugador');
+  $('editor-jugador').style.display = '';
+}
+
+function setTodosLosSliders(valor) {
+  $('grid-attrs').querySelectorAll('.attr-fila').forEach((fila) => {
+    const range = fila.querySelector('input');
+    range.value = String(valor);
+    fila.querySelector('.attr-val').textContent = String(valor);
+    fila.classList.toggle('cambiado', String(valor) !== fila.dataset.original);
+  });
+}
+$('btn-todo-99').addEventListener('click', () => setTodosLosSliders(99));
+$('btn-reset-jug').addEventListener('click', () => {
+  $('grid-attrs').querySelectorAll('.attr-fila').forEach((fila) => {
+    const range = fila.querySelector('input');
+    range.value = fila.dataset.original;
+    fila.querySelector('.attr-val').textContent = fila.dataset.original;
+    fila.classList.remove('cambiado');
+  });
+});
+
+$('btn-aplicar-jugador').addEventListener('click', () => {
+  if (!jugadorSel) return;
+  const valores = {};
+  $('grid-attrs').querySelectorAll('.attr-fila').forEach((fila) => {
+    valores[fila.dataset.attr] = parseInt(fila.querySelector('input').value, 10);
+  });
+  try {
+    escribirAtributos(estado.buffer, jugadorSel.offsetAtributos, valores);
+  } catch (e) { mostrar('aviso-jugador', e.message, 'error'); return; }
+  jugadorSel.atributos = leerAtributos(estado.buffer, jugadorSel.offsetAtributos);
+  // Nueva línea base: lo aplicado ya no está "cambiado"
+  $('grid-attrs').querySelectorAll('.attr-fila').forEach((fila) => {
+    fila.dataset.original = fila.querySelector('input').value;
+    fila.classList.remove('cambiado');
+  });
+  marcarSucio();
+  mostrar('aviso-jugador', 'Aplicado en memoria a ' + jugadorSel.nombreLargo + ' (temporada actual y próxima). Falta guardar.', 'ok');
 });
 
 /* ============================================================================
@@ -1053,7 +1304,15 @@ function descargar(bytes, nombre) {
   URL.revokeObjectURL(url);
 }
 
-$('btn-guardar').addEventListener('click', async () => {
+// Marca el buffer como modificado y habilita todos los botones de guardar.
+function marcarSucio() {
+  estado.sucio = true;
+  $('btn-guardar').disabled = false;
+  $('btn-guardar-jug').disabled = false;
+  ponerEstado(estado.nombre + ' — cambios sin guardar', 'sucio');
+}
+
+async function guardarArchivo() {
   if (!estado.sucio) return;
   try {
     if (estado.handle) {
@@ -1071,11 +1330,14 @@ $('btn-guardar').addEventListener('click', async () => {
     }
     estado.sucio = false;
     $('btn-guardar').disabled = true;
+    $('btn-guardar-jug').disabled = true;
     ponerEstado(estado.nombre + ' — guardado', 'ok');
   } catch (e) {
     toast('Error al guardar: ' + e.message + (e.name === 'NoModificationAllowedError' ? ' (¿está abierto el juego?)' : ''));
   }
-});
+}
+$('btn-guardar').addEventListener('click', guardarArchivo);
+$('btn-guardar-jug').addEventListener('click', guardarArchivo);
 
 $('btn-backup').addEventListener('click', () => {
   descargar(estado.original, estado.nombre + '.bak');
@@ -1087,9 +1349,13 @@ $('btn-restaurar').addEventListener('click', () => {
   estado.buffer = estado.original.slice();
   estado.caja = null;
   estado.sucio = false;
+  $('btn-guardar').disabled = true;
+  $('btn-guardar-jug').disabled = true;
   $('resultado-caja').classList.remove('visible');
   $('seccion-editar').style.display = 'none';
   $('input-pesos').value = '';
+  $('input-jugador').value = '';
+  resetSeccionJugadores();
   ocultar('error-localizar');
   ponerEstado(estado.nombre, 'ok');
   toast('Restaurado el contenido original (en memoria).');
